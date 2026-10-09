@@ -15,6 +15,7 @@ def inicio():
         "fecha_fin": request.form.get("fecha_fin", ""),
         "rsi_entrada": request.form.get("rsi_entrada", "30"),
         "rsi_salida": request.form.get("rsi_salida", "70"),
+        "probabilidad_minima": request.form.get("probabilidad_minima", "50"),
     }
     error = None
     resultado = None
@@ -41,12 +42,15 @@ def inicio():
             try:
                 rsi_entrada = float(valores["rsi_entrada"])
                 rsi_salida = float(valores["rsi_salida"])
+                probabilidad_minima = float(valores["probabilidad_minima"])
                 if not 0 <= rsi_entrada <= 100 or not 0 <= rsi_salida <= 100:
                     error = "Los valores RSI deben estar entre 0 y 100."
                 elif rsi_entrada >= rsi_salida:
                     error = "El RSI de entrada debe ser menor que el RSI de salida."
+                elif not 0 <= probabilidad_minima <= 100:
+                    error = "La probabilidad de subida debe estar entre 0 y 100."
             except ValueError:
-                error = "Introduce valores numéricos válidos para los RSI."
+                error = "Introduce valores numéricos válidos para RSI y probabilidad."
 
         if error is None:
             try:
@@ -57,6 +61,7 @@ def inicio():
                         valores["fecha_fin"],
                         rsi_entrada,
                         rsi_salida,
+                        probabilidad_minima / 100,
                     )
                 )
                 resultado = {

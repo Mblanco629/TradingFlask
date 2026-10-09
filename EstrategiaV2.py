@@ -71,6 +71,7 @@ def calcular_indicadores(df):
 def generar_senal(
     sma_50, sma_200, prob_subida, rsi,
     rsi_entrada: float = 30.0, rsi_salida: float = 70.0,
+    probabilidad_minima: float = 0.50,
 ):
     """Combina la tendencia, la IA y el RSI para generar una recomendación."""
     if (
@@ -84,7 +85,7 @@ def generar_senal(
     if (
         rsi < rsi_entrada
         and sma_50 > sma_200
-        and prob_subida > 0.50
+        and prob_subida > probabilidad_minima
     ):
         return "COMPRA (BUY)"
     if (
@@ -188,6 +189,7 @@ def graficar_resultados(df, ticker, recomendacion_manana):
 def ejecutar_estrategia(
     ticker, fecha_inicio, fecha_fin,
     rsi_entrada: float = 30.0, rsi_salida: float = 70.0,
+    probabilidad_minima: float = 0.50,
 ):
     """Entrena y evalúa la estrategia para el activo y período indicados."""
     df_crudo = descargar_datos(ticker, fecha_inicio, fecha_fin)
@@ -231,6 +233,7 @@ def ejecutar_estrategia(
         lambda fila: generar_senal(
             fila['SMA_50'], fila['SMA_200'],
             fila['Prob_Subida'], fila['RSI'], rsi_entrada, rsi_salida,
+            probabilidad_minima,
         ),
         axis=1,
     )

@@ -114,6 +114,12 @@
                        min="0" max="100" step="any"
                        value="{{ valores.rsi_salida }}" required>
             </label>
+            <label for="probabilidad_minima">
+                Umbral de probabilidad de subida para comprar (%)
+                <input id="probabilidad_minima" name="probabilidad_minima"
+                       type="number" min="0" max="100" step="any"
+                       value="{{ valores.probabilidad_minima }}" required>
+            </label>
             <button type="submit">Ejecutar análisis</button>
         </form>
 
