@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Backtesting de estrategia</title>
+    <style>
+        :root {
+            color-scheme: light;
+            font-family: system-ui, sans-serif;
+            color: #172033;
+            background: #f3f6fb;
+        }
+        body {
+            margin: 0;
+            padding: 3rem 1rem;
+        }
+        main {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        .card {
+            padding: 2rem;
+            border: 1px solid #dce3ed;
+            border-radius: 12px;
+            background: white;
+            box-shadow: 0 8px 24px #17203310;
+        }
+        h1, h2 {
+            margin-top: 0;
+        }
+        form {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 1rem;
+            align-items: end;
+        }
+        label {
+            display: grid;
+            gap: 0.4rem;
+            font-weight: 600;
+        }
+        input, button {
+            box-sizing: border-box;
+            min-height: 44px;
+            padding: 0.65rem 0.75rem;
+            border: 1px solid #bdc8d8;
+            border-radius: 6px;
+            font: inherit;
+        }
+        button {
+            border: 0;
+            color: white;
+            background: #2457c5;
+            font-weight: 700;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #1945a4;
+        }
+        .error {
+            margin-top: 1rem;
+            padding: 0.8rem 1rem;
+            border-radius: 6px;
+            color: #8b1d1d;
+            background: #fff0f0;
+        }
+        .results {
+            margin-top: 2rem;
+        }
+        .metrics {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem 2rem;
+        }
+        .chart {
+            display: block;
+            width: 100%;
+            height: auto;
+            margin-top: 1rem;
+        }
+    </style>
+</head>
+<body>
+<main>
+    <section class="card">
+        <h1>Backtesting de estrategia</h1>
+        <p>Elige el activo y el período para ejecutar el análisis.</p>
+        <form method="post">
+            <label for="ticker">
+                Ticker
+                <input id="ticker" name="ticker" value="{{ valores.ticker }}"
+                       placeholder="SAN.MC" required>
+            </label>
+            <label for="fecha_inicio">
+                Fecha de inicio
+                <input id="fecha_inicio" name="fecha_inicio" type="date"
+                       value="{{ valores.fecha_inicio }}" max="{{ hoy }}" required>
+            </label>
+            <label for="fecha_fin">
+                Fecha de fin
+                <input id="fecha_fin" name="fecha_fin" type="date"
+                       value="{{ valores.fecha_fin }}" max="{{ hoy }}" required>
+            </label>
+            <label for="rsi_entrada">
+                RSI de entrada (compra)
+                <input id="rsi_entrada" name="rsi_entrada" type="number"
+                       min="0" max="100" step="any"
+                       value="{{ valores.rsi_entrada }}" required>
+            </label>
+            <label for="rsi_salida">
+                RSI de salida (venta)
+                <input id="rsi_salida" name="rsi_salida" type="number"
+                       min="0" max="100" step="any"
+                       value="{{ valores.rsi_salida }}" required>
+            </label>
+            <button type="submit">Ejecutar análisis</button>
+        </form>
+
+        {% if error %}
+        <p class="error" role="alert">{{ error }}</p>
+        {% endif %}
+
+        {% if resultado %}
+        <section class="results" aria-labelledby="resultado-titulo">
+            <h2 id="resultado-titulo">Resultados para {{ valores.ticker }}</h2>
+            <div class="metrics">
+                <p>Mercado: <strong>{{ "%.2f"|format(resultado.rentabilidad_mercado) }}%</strong></p>
+                <p>Estrategia: <strong>{{ "%.2f"|format(resultado.rentabilidad_estrategia) }}%</strong></p>
+            </div>
+            <img class="chart"
+                 src="data:image/png;base64,{{ resultado.grafico }}"
+                 alt="Gráfico de rendimiento de la estrategia frente al mercado">
+        </section>
+        {% endif %}
+    </section>
+</main>
+</body>
+</html>
