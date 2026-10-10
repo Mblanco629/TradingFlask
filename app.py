@@ -16,6 +16,11 @@ def inicio():
         "rsi_entrada": request.form.get("rsi_entrada", "30"),
         "rsi_salida": request.form.get("rsi_salida", "70"),
         "probabilidad_minima": request.form.get("probabilidad_minima", "50"),
+        "probabilidad_maxima_venta": request.form.get(
+            "probabilidad_maxima_venta", "30"
+        ),
+        "periodo_media_corta": request.form.get("periodo_media_corta", "50"),
+        "periodo_media_larga": request.form.get("periodo_media_larga", "200"),
     }
     error = None
     resultado = None
@@ -43,14 +48,34 @@ def inicio():
                 rsi_entrada = float(valores["rsi_entrada"])
                 rsi_salida = float(valores["rsi_salida"])
                 probabilidad_minima = float(valores["probabilidad_minima"])
+                probabilidad_maxima_venta = float(
+                    valores["probabilidad_maxima_venta"]
+                )
+                periodo_media_corta = int(valores["periodo_media_corta"])
+                periodo_media_larga = int(valores["periodo_media_larga"])
                 if not 0 <= rsi_entrada <= 100 or not 0 <= rsi_salida <= 100:
                     error = "Los valores RSI deben estar entre 0 y 100."
                 elif rsi_entrada >= rsi_salida:
                     error = "El RSI de entrada debe ser menor que el RSI de salida."
                 elif not 0 <= probabilidad_minima <= 100:
                     error = "La probabilidad de subida debe estar entre 0 y 100."
+                elif not 0 <= probabilidad_maxima_venta <= 100:
+                    error = (
+                        "La probabilidad máxima de subida para vender "
+                        "debe estar entre 0 y 100."
+                    )
+                elif periodo_media_corta < 1 or periodo_media_larga < 1:
+                    error = "Los períodos de las medias móviles deben ser positivos."
+                elif periodo_media_corta >= periodo_media_larga:
+                    error = (
+                        "El período de la media corta debe ser menor que "
+                        "el de la media larga."
+                    )
             except ValueError:
-                error = "Introduce valores numéricos válidos para RSI y probabilidad."
+                error = (
+                    "Introduce valores numéricos válidos para RSI, probabilidad "
+                    "y períodos de las medias móviles."
+                )
 
         if error is None:
             try:
@@ -62,6 +87,9 @@ def inicio():
                         rsi_entrada,
                         rsi_salida,
                         probabilidad_minima / 100,
+                        probabilidad_maxima_venta / 100,
+                        periodo_media_corta,
+                        periodo_media_larga,
                     )
                 )
                 resultado = {

@@ -120,6 +120,25 @@
                        type="number" min="0" max="100" step="any"
                        value="{{ valores.probabilidad_minima }}" required>
             </label>
+            <label for="probabilidad_maxima_venta">
+                Umbral máximo de probabilidad de subida para vender (%)
+                <input id="probabilidad_maxima_venta"
+                       name="probabilidad_maxima_venta" type="number"
+                       min="0" max="100" step="any"
+                       value="{{ valores.probabilidad_maxima_venta }}" required>
+            </label>
+            <label for="periodo_media_corta">
+                Período de la media móvil corta (días)
+                <input id="periodo_media_corta" name="periodo_media_corta"
+                       type="number" min="1" step="1"
+                       value="{{ valores.periodo_media_corta }}" required>
+            </label>
+            <label for="periodo_media_larga">
+                Período de la media móvil larga (días)
+                <input id="periodo_media_larga" name="periodo_media_larga"
+                       type="number" min="2" step="1"
+                       value="{{ valores.periodo_media_larga }}" required>
+            </label>
             <button type="submit">Ejecutar análisis</button>
         </form>
 
@@ -136,7 +155,7 @@
             </div>
             <img class="chart"
                  src="data:image/png;base64,{{ resultado.grafico }}"
-                 alt="Gráfico de rendimiento de la estrategia frente al mercado">
+                 alt="Gráfico de precio con medias móviles, RSI y rendimiento de la estrategia frente al mercado">
         </section>
         {% endif %}
     </section>

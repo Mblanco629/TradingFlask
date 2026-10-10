@@ -35,14 +35,16 @@ def descargar_datos(ticker, fecha_inicio, fecha_fin):
 # =========================================================
 # MÓDULO 2: INGENIERÍA DE CARACTERÍSTICAS
 # =========================================================
-def calcular_indicadores(df):
+def calcular_indicadores(
+    df, periodo_media_corta: int = 50, periodo_media_larga: int = 200,
+):
     """Añade indicadores matemáticos al DataFrame crudo."""
     print("Calculando indicadores técnicos...")
     df = df.copy()
     
     # 1. Medias Móviles Simples (SMA)
-    df['SMA_50'] = df['Close'].rolling(window=50).mean()
-    df['SMA_200'] = df['Close'].rolling(window=200).mean()
+    df['SMA_corta'] = df['Close'].rolling(window=periodo_media_corta).mean()
+    df['SMA_larga'] = df['Close'].rolling(window=periodo_media_larga).mean()
     
     # 2. Volatilidad (Desviación estándar de 20 días)
     df['Volatilidad'] = df['Close'].rolling(window=20).std()
@@ -72,6 +74,7 @@ def generar_senal(
     sma_50, sma_200, prob_subida, rsi,
     rsi_entrada: float = 30.0, rsi_salida: float = 70.0,
     probabilidad_minima: float = 0.50,
+    probabilidad_maxima_venta: float = 0.30,
 ):
     """Combina la tendencia, la IA y el RSI para generar una recomendación."""
     if (
@@ -91,7 +94,7 @@ def generar_senal(
     if (
         rsi > rsi_salida
         and sma_50 < sma_200
-        and prob_subida < 0.30
+        and prob_subida < probabilidad_maxima_venta
     ):
         return "VENTA (SELL)"
     return "MANTENER (HOLD)"
@@ -124,16 +127,28 @@ def ejecutar_backtest(df):
 # =========================================================
 # MÓDULO 6: VISUALIZACIÓN DE RESULTADOS
 # =========================================================
-def graficar_resultados(df, ticker, recomendacion_manana):
-    """Grafica las señales de trading y el rendimiento de la estrategia."""
+def graficar_resultados(
+    df, ticker, recomendacion_manana,
+    rsi_entrada: float = 30.0, rsi_salida: float = 70.0,
+    periodo_media_corta: int = 50, periodo_media_larga: int = 200,
+):
+    """Grafica las señales, los indicadores técnicos y el rendimiento."""
     print("Generando gráficos...")
-    figura, (eje_precio, eje_capital) = plt.subplots(
-        2, 1, figsize=(12, 9), sharex=True,
-        gridspec_kw={'height_ratios': [2, 1]},
+    figura, (eje_precio, eje_rsi, eje_capital) = plt.subplots(
+        3, 1, figsize=(12, 11), sharex=True,
+        gridspec_kw={'height_ratios': [2, 1, 1]},
     )
 
     eje_precio.plot(
         df.index, df['Close'], label='Precio de cierre', color='black'
+    )
+    eje_precio.plot(
+        df.index, df['SMA_corta'],
+        label=f'Media móvil corta ({periodo_media_corta})', color='orange'
+    )
+    eje_precio.plot(
+        df.index, df['SMA_larga'],
+        label=f'Media móvil larga ({periodo_media_larga})', color='purple'
     )
     compras = df[df['Senal_Trading'] == 1]
     ventas = df[df['Senal_Trading'] == -1]
@@ -154,6 +169,20 @@ def graficar_resultados(df, ticker, recomendacion_manana):
     eje_precio.set_ylabel('Precio')
     eje_precio.legend()
     eje_precio.grid(True, alpha=0.3)
+
+    eje_rsi.plot(df.index, df['RSI'], label='RSI (14)', color='teal')
+    eje_rsi.axhline(
+        rsi_entrada, color='green', linestyle='--',
+        label=f'Umbral de entrada ({rsi_entrada:g})',
+    )
+    eje_rsi.axhline(
+        rsi_salida, color='red', linestyle='--',
+        label=f'Umbral de salida ({rsi_salida:g})',
+    )
+    eje_rsi.set_ylabel('RSI')
+    eje_rsi.set_ylim(0, 100)
+    eje_rsi.legend()
+    eje_rsi.grid(True, alpha=0.3)
     
     # Línea base: ¿Qué habría pasado si solo comprabas y esperabas?
     eje_capital.plot(
@@ -190,10 +219,20 @@ def ejecutar_estrategia(
     ticker, fecha_inicio, fecha_fin,
     rsi_entrada: float = 30.0, rsi_salida: float = 70.0,
     probabilidad_minima: float = 0.50,
+    probabilidad_maxima_venta: float = 0.30,
+    periodo_media_corta: int = 50, periodo_media_larga: int = 200,
 ):
     """Entrena y evalúa la estrategia para el activo y período indicados."""
     df_crudo = descargar_datos(ticker, fecha_inicio, fecha_fin)
-    df_indicadores = calcular_indicadores(df_crudo)
+    if periodo_media_corta < 1 or periodo_media_larga < 1:
+        raise ValueError("Los períodos de las medias móviles deben ser positivos.")
+    if periodo_media_corta >= periodo_media_larga:
+        raise ValueError(
+            "El período de la media corta debe ser menor que el de la media larga."
+        )
+    df_indicadores = calcular_indicadores(
+        df_crudo, periodo_media_corta, periodo_media_larga
+    )
 
     print("Preparando datos para la Inteligencia Artificial...")
     df_indicadores['Target'] = (
@@ -201,7 +240,7 @@ def ejecutar_estrategia(
     ).astype(int)
     df_ml = df_indicadores.dropna().copy()
 
-    features = ['SMA_50', 'SMA_200', 'Volatilidad']
+    features = ['SMA_corta', 'SMA_larga', 'Volatilidad']
     train_size = int(len(df_ml) * 0.8)
     if train_size < 2 or len(df_ml) - train_size < 2:
         raise ValueError(
@@ -231,9 +270,9 @@ def ejecutar_estrategia(
 
     df_ml['Recomendacion'] = df_ml.apply(
         lambda fila: generar_senal(
-            fila['SMA_50'], fila['SMA_200'],
+            fila['SMA_corta'], fila['SMA_larga'],
             fila['Prob_Subida'], fila['RSI'], rsi_entrada, rsi_salida,
-            probabilidad_minima,
+            probabilidad_minima, probabilidad_maxima_venta,
         ),
         axis=1,
     )
@@ -256,7 +295,9 @@ def ejecutar_estrategia(
         )
 
     grafico = graficar_resultados(
-        df_resultados, ticker, recomendacion_manana
+        df_resultados, ticker, recomendacion_manana,
+        rsi_entrada, rsi_salida,
+        periodo_media_corta, periodo_media_larga,
     )
     rentabilidad_mercado = (
         df_resultados['Capital_Mercado'].iloc[-1] - 1
@@ -266,7 +307,7 @@ def ejecutar_estrategia(
     ) * 100
     return grafico, rentabilidad_mercado, rentabilidad_estrategia
 
-if __name__ == "__main__":
+# if __name__ == "__main__":
     TICKER = "SAN.MC"  # Puedes cambiarlo a "AAPL", "EURUSD=X", etc.
     FECHA_INICIO = "2025-01-01"
     FECHA_FIN = "2026-09-01"
