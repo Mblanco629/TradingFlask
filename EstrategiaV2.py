@@ -1,13 +1,8 @@
-import base64
-from io import BytesIO
-
 import yfinance as yf
 import pandas as pd
 import numpy as np
-import matplotlib
-
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 from sklearn.ensemble import RandomForestClassifier
 
 
@@ -257,101 +252,143 @@ def graficar_resultados(
     probabilidad_minima: float = 0.50,
     probabilidad_maxima_venta: float = 0.30,
 ):
-    """Grafica las señales, los indicadores técnicos y el rendimiento."""
+    """Genera un gráfico interactivo con señales e indicadores de la estrategia."""
     print("Generando gráficos...")
-    figura, (eje_precio, eje_rsi, eje_probabilidad, eje_capital) = plt.subplots(
-        4, 1, figsize=(12, 13), sharex=True,
-        gridspec_kw={'height_ratios': [2, 1, 1, 1]},
+    figura = make_subplots(
+        rows=4, cols=1, shared_xaxes=True, vertical_spacing=0.06,
+        row_heights=[0.4, 0.2, 0.2, 0.2],
+        subplot_titles=(
+            'Precio y señales', 'RSI (14)',
+            'Probabilidad de subida', 'Capital acumulado',
+        ),
     )
 
-    eje_precio.plot(
-        df.index, df['Close'], label='Precio de cierre', color='black'
+    figura.add_trace(
+        go.Scatter(
+            x=df.index, y=df['Close'], mode='lines',
+            name='Precio de cierre', line={'color': 'black'},
+        ),
+        row=1, col=1,
     )
-    eje_precio.plot(
-        df.index, df['SMA_corta'],
-        label=f'Media móvil corta ({periodo_media_corta})', color='orange'
+    figura.add_trace(
+        go.Scatter(
+            x=df.index, y=df['SMA_corta'], mode='lines',
+            name=f'Media móvil corta ({periodo_media_corta})',
+            line={'color': 'orange'},
+        ),
+        row=1, col=1,
     )
-    eje_precio.plot(
-        df.index, df['SMA_larga'],
-        label=f'Media móvil larga ({periodo_media_larga})', color='purple'
+    figura.add_trace(
+        go.Scatter(
+            x=df.index, y=df['SMA_larga'], mode='lines',
+            name=f'Media móvil larga ({periodo_media_larga})',
+            line={'color': 'purple'},
+        ),
+        row=1, col=1,
     )
     compras = df[df['Senal_Trading'] == 1]
     ventas = df[df['Senal_Trading'] == -1]
-    eje_precio.scatter(
-        compras.index, compras['Close'], marker='^', color='green',
-        s=90, label='Compra (BUY)', zorder=3,
+    figura.add_trace(
+        go.Scatter(
+            x=compras.index, y=compras['Close'], mode='markers',
+            name='Compra (BUY)',
+            marker={'symbol': 'triangle-up', 'color': 'green', 'size': 10},
+        ),
+        row=1, col=1,
     )
-    eje_precio.scatter(
-        ventas.index, ventas['Close'], marker='v', color='red',
-        s=90, label='Venta (SELL)', zorder=3,
+    figura.add_trace(
+        go.Scatter(
+            x=ventas.index, y=ventas['Close'], mode='markers',
+            name='Venta (SELL)',
+            marker={'symbol': 'triangle-down', 'color': 'red', 'size': 10},
+        ),
+        row=1, col=1,
     )
-    eje_precio.text(
-        0.02, 0.95,
-        f"Recomendación para mañana: {recomendacion_manana}",
-        transform=eje_precio.transAxes, va='top',
-        bbox={'boxstyle': 'round', 'facecolor': 'white', 'alpha': 0.85},
+    figura.add_annotation(
+        x=0.01, y=0.98, xref='x domain', yref='y domain',
+        text=f'Recomendación para mañana: {recomendacion_manana}',
+        showarrow=False, bgcolor='white', opacity=0.85,
     )
-    eje_precio.set_ylabel('Precio')
-    eje_precio.legend()
-    eje_precio.grid(True, alpha=0.3)
 
-    eje_rsi.plot(df.index, df['RSI'], label='RSI (14)', color='teal')
-    eje_rsi.axhline(
-        rsi_entrada, color='green', linestyle='--',
-        label=f'Umbral de entrada ({rsi_entrada:g})',
+    figura.add_trace(
+        go.Scatter(
+            x=df.index, y=df['RSI'], mode='lines', name='RSI (14)',
+            line={'color': 'teal'},
+        ),
+        row=2, col=1,
     )
-    eje_rsi.axhline(
-        rsi_salida, color='red', linestyle='--',
-        label=f'Umbral de salida ({rsi_salida:g})',
+    figura.add_hline(
+        y=rsi_entrada, line_dash='dash', line_color='green',
+        annotation_text=f'Umbral de entrada ({rsi_entrada:g})',
+        row=2, col=1,
     )
-    eje_rsi.set_ylabel('RSI')
-    eje_rsi.set_ylim(0, 100)
-    eje_rsi.legend()
-    eje_rsi.grid(True, alpha=0.3)
+    figura.add_hline(
+        y=rsi_salida, line_dash='dash', line_color='red',
+        annotation_text=f'Umbral de salida ({rsi_salida:g})',
+        row=2, col=1,
+    )
+    figura.update_yaxes(title_text='RSI', range=[0, 100], row=2, col=1)
 
-    eje_probabilidad.plot(
-        df.index, df['Prob_Subida'] * 100,
-        label='Probabilidad de subida', color='blue',
+    figura.add_trace(
+        go.Scatter(
+            x=df.index, y=df['Prob_Subida'] * 100, mode='lines',
+            name='Probabilidad de subida', line={'color': 'blue'},
+        ),
+        row=3, col=1,
     )
-    eje_probabilidad.axhline(
-        probabilidad_minima * 100, color='green', linestyle='--',
-        label=f'Umbral de compra ({probabilidad_minima * 100:g}%)',
+    figura.add_hline(
+        y=probabilidad_minima * 100, line_dash='dash', line_color='green',
+        annotation_text=f'Umbral de compra ({probabilidad_minima * 100:g}%)',
+        row=3, col=1,
     )
-    eje_probabilidad.axhline(
-        probabilidad_maxima_venta * 100, color='red', linestyle='--',
-        label=f'Umbral de venta ({probabilidad_maxima_venta * 100:g}%)',
+    figura.add_hline(
+        y=probabilidad_maxima_venta * 100, line_dash='dash',
+        line_color='red',
+        annotation_text=(
+            f'Umbral de venta ({probabilidad_maxima_venta * 100:g}%)'
+        ),
+        row=3, col=1,
     )
-    eje_probabilidad.set_ylabel('Prob. subida (%)')
-    eje_probabilidad.set_ylim(0, 100)
-    eje_probabilidad.legend()
-    eje_probabilidad.grid(True, alpha=0.3)
-    
-    # Línea base: ¿Qué habría pasado si solo comprabas y esperabas?
-    eje_capital.plot(
-        df.index, df['Capital_Mercado'],
-        label='Mercado (Buy & Hold)', color='gray', alpha=0.6,
+    figura.update_yaxes(
+        title_text='Prob. subida (%)', range=[0, 100], row=3, col=1
     )
-    
-    # Nuestra estrategia: ¿Qué pasó operando con las señales de la IA?
-    eje_capital.plot(
-        df.index, df['Capital_Estrategia'],
-        label='Estrategia IA', color='blue', linewidth=2,
+
+    figura.add_trace(
+        go.Scatter(
+            x=df.index, y=df['Capital_Mercado'], mode='lines',
+            name='Mercado (Buy & Hold)',
+            line={'color': 'gray'}, opacity=0.6,
+        ),
+        row=4, col=1,
     )
-    
-    eje_precio.set_title(f'Señales de trading y backtest ({ticker})')
-    eje_capital.set_xlabel('Fecha')
-    eje_capital.set_ylabel('Multiplicador de capital')
-    eje_capital.legend()
-    eje_capital.grid(True, alpha=0.3)
-    
+    figura.add_trace(
+        go.Scatter(
+            x=df.index, y=df['Capital_Estrategia'], mode='lines',
+            name='Estrategia IA', line={'color': 'blue', 'width': 2},
+        ),
+        row=4, col=1,
+    )
+
+    figura.update_layout(
+        title=f'Señales de trading y backtest ({ticker})',
+        height=900, hovermode='x unified',
+        legend={'orientation': 'h', 'yanchor': 'bottom', 'y': 1.02},
+        margin={'l': 60, 'r': 30, 't': 110, 'b': 50},
+    )
+    figura.update_yaxes(title_text='Precio', row=1, col=1)
+    figura.update_yaxes(title_text='Multiplicador', row=4, col=1)
+    figura.update_xaxes(title_text='Fecha', row=4, col=1)
+    figura.update_xaxes(showgrid=True)
+    figura.update_yaxes(showgrid=True)
+
     # Resumen de texto en consola
     rent_mercado = (df['Capital_Mercado'].iloc[-1] - 1) * 100
     rent_estrategia = (df['Capital_Estrategia'].iloc[-1] - 1) * 100
     print(f"\n--- RESUMEN FINAL ---")
     print(f"Rentabilidad Mercado: {rent_mercado:.2f}%")
     print(f"Rentabilidad Estrategia: {rent_estrategia:.2f}%")
-    
-    imagen = BytesIO()
-    figura.savefig(imagen, format="png", bbox_inches="tight")
-    plt.close(figura)
-    return base64.b64encode(imagen.getvalue()).decode("ascii")
+
+    return figura.to_html(
+        full_html=False, include_plotlyjs='cdn',
+        config={'responsive': True},
+    )

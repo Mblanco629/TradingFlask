@@ -73,11 +73,15 @@
             flex-wrap: wrap;
             gap: 1rem 2rem;
         }
-        .chart {
-            display: block;
-            width: 100%;
-            height: auto;
+        .chart-container {
             margin-top: 1rem;
+        }
+        .chart-help {
+            margin: 1rem 0 0;
+            padding: 0.8rem 1rem;
+            border-left: 4px solid #2457c5;
+            border-radius: 4px;
+            background: #f3f6fb;
         }
     </style>
 </head>
@@ -155,9 +159,16 @@
                 <p>Probabilidad estimada de subida: <strong>{{ "%.2f"|format(resultado.probabilidad_subida) }}%</strong></p>
                 <p>Último valor de Senal_Trading: <strong>{{ resultado.ultima_senal_trading }}</strong></p>
             </div>
-            <img class="chart"
-                 src="data:image/png;base64,{{ resultado.grafico }}"
-                 alt="Gráfico de precio con medias móviles, RSI y rendimiento de la estrategia frente al mercado">
+            <p class="chart-help">
+                <strong>Ayuda del gráfico:</strong>
+                pasa el cursor sobre las líneas o puntos para consultar sus valores;
+                arrastra sobre el gráfico para ampliar una zona y haz doble clic
+                para restablecer la vista. Al pasar el cursor por el gráfico aparecen
+                controles para desplazarte, ampliar o reducir, ajustar la vista y
+                descargar una imagen PNG. Haz clic en una serie de la leyenda para
+                mostrarla u ocultarla.
+            </p>
+            <div class="chart-container">{{ resultado.grafico|safe }}</div>
         </section>
         {% endif %}
     </section>
