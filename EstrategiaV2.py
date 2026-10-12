@@ -131,12 +131,14 @@ def graficar_resultados(
     df, ticker, recomendacion_manana,
     rsi_entrada: float = 30.0, rsi_salida: float = 70.0,
     periodo_media_corta: int = 50, periodo_media_larga: int = 200,
+    probabilidad_minima: float = 0.50,
+    probabilidad_maxima_venta: float = 0.30,
 ):
     """Grafica las señales, los indicadores técnicos y el rendimiento."""
     print("Generando gráficos...")
-    figura, (eje_precio, eje_rsi, eje_capital) = plt.subplots(
-        3, 1, figsize=(12, 11), sharex=True,
-        gridspec_kw={'height_ratios': [2, 1, 1]},
+    figura, (eje_precio, eje_rsi, eje_probabilidad, eje_capital) = plt.subplots(
+        4, 1, figsize=(12, 13), sharex=True,
+        gridspec_kw={'height_ratios': [2, 1, 1, 1]},
     )
 
     eje_precio.plot(
@@ -183,6 +185,23 @@ def graficar_resultados(
     eje_rsi.set_ylim(0, 100)
     eje_rsi.legend()
     eje_rsi.grid(True, alpha=0.3)
+
+    eje_probabilidad.plot(
+        df.index, df['Prob_Subida'] * 100,
+        label='Probabilidad de subida', color='blue',
+    )
+    eje_probabilidad.axhline(
+        probabilidad_minima * 100, color='green', linestyle='--',
+        label=f'Umbral de compra ({probabilidad_minima * 100:g}%)',
+    )
+    eje_probabilidad.axhline(
+        probabilidad_maxima_venta * 100, color='red', linestyle='--',
+        label=f'Umbral de venta ({probabilidad_maxima_venta * 100:g}%)',
+    )
+    eje_probabilidad.set_ylabel('Prob. subida (%)')
+    eje_probabilidad.set_ylim(0, 100)
+    eje_probabilidad.legend()
+    eje_probabilidad.grid(True, alpha=0.3)
     
     # Línea base: ¿Qué habría pasado si solo comprabas y esperabas?
     eje_capital.plot(
@@ -215,6 +234,10 @@ def graficar_resultados(
     return base64.b64encode(imagen.getvalue()).decode("ascii")
 
 
+# =========================================================
+# MÓDULO 6: EJECUTAR ESTRATEGIA (Función principal)
+# =========================================================
+
 def ejecutar_estrategia(
     ticker, fecha_inicio, fecha_fin,
     rsi_entrada: float = 30.0, rsi_salida: float = 70.0,
@@ -240,7 +263,7 @@ def ejecutar_estrategia(
     ).astype(int)
     df_ml = df_indicadores.dropna().copy()
 
-    features = ['SMA_corta', 'SMA_larga', 'Volatilidad']
+    features = ['SMA_corta', 'SMA_larga', 'Volatilidad', 'RSI']
     train_size = int(len(df_ml) * 0.8)
     if train_size < 2 or len(df_ml) - train_size < 2:
         raise ValueError(
@@ -298,6 +321,7 @@ def ejecutar_estrategia(
         df_resultados, ticker, recomendacion_manana,
         rsi_entrada, rsi_salida,
         periodo_media_corta, periodo_media_larga,
+        probabilidad_minima, probabilidad_maxima_venta,
     )
     rentabilidad_mercado = (
         df_resultados['Capital_Mercado'].iloc[-1] - 1
@@ -306,9 +330,3 @@ def ejecutar_estrategia(
         df_resultados['Capital_Estrategia'].iloc[-1] - 1
     ) * 100
     return grafico, rentabilidad_mercado, rentabilidad_estrategia
-
-# if __name__ == "__main__":
-    TICKER = "SAN.MC"  # Puedes cambiarlo a "AAPL", "EURUSD=X", etc.
-    FECHA_INICIO = "2025-01-01"
-    FECHA_FIN = "2026-09-01"
-    ejecutar_estrategia(TICKER, FECHA_INICIO, FECHA_FIN)
