@@ -152,6 +152,8 @@
             <div class="metrics">
                 <p>Mercado: <strong>{{ "%.2f"|format(resultado.rentabilidad_mercado) }}%</strong></p>
                 <p>Estrategia: <strong>{{ "%.2f"|format(resultado.rentabilidad_estrategia) }}%</strong></p>
+                <p>Probabilidad estimada de subida: <strong>{{ "%.2f"|format(resultado.probabilidad_subida) }}%</strong></p>
+                <p>Último valor de Senal_Trading: <strong>{{ resultado.ultima_senal_trading }}</strong></p>
             </div>
             <img class="chart"
                  src="data:image/png;base64,{{ resultado.grafico }}"

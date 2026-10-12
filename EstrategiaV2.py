@@ -33,7 +33,7 @@ def descargar_datos(ticker, fecha_inicio, fecha_fin):
     return df.dropna()
 
 # =========================================================
-# MÓDULO 2: INGENIERÍA DE CARACTERÍSTICAS
+# MÓDULO 2: CALCULO DE INDICADORES TÉCNICOS
 # =========================================================
 def calcular_indicadores(
     df, periodo_media_corta: int = 50, periodo_media_larga: int = 200,
@@ -77,20 +77,40 @@ def generar_senal(
     probabilidad_maxima_venta: float = 0.30,
 ):
     """Combina la tendencia, la IA y el RSI para generar una recomendación."""
+
+#• Al inicio de los datos históricos, las medias móviles (como la sma_200) no tienen suficientes 
+# velas previas para calcularse y devuelven NaN. Si intentas operar con un NaN, 
+# el código fallaría. Ante la duda, la función adopta una postura segura y devuelve MANTENER.
+
     if (
         pd.isna(sma_50) or pd.isna(sma_200)
         or pd.isna(prob_subida) or pd.isna(rsi)
     ):
         return "MANTENER (HOLD)"
 
+# • Qué hace: Si el RSI está en su rango normal (entre 30 y 70), significa que el mercado está en una zona de equilibrio o consolidación.
+# • Resultado: No se toma ninguna acción operativa. Directamente devuelve MANTENER, ahorrando tiempo de cómputo al no evaluar el resto de condiciones.
+
     if rsi_entrada <= rsi <= rsi_salida:
         return "MANTENER (HOLD)"
+
+# Para que la función te diga que compres, se tienen que cumplir las 3 condiciones estrictamente al mismo tiempo:
+# 1. RSI < 30: El precio ha caído rápido y el activo está "barato" o en sobreventa.
+# 2. SMA 50 > SMA 200: Existe una tendencia alcista de fondo (conocido como Cruce de Oro si ocurre recientemente). Esto asegura que no estás comprando un activo en caída libre infinita.
+# 3. Probabilidad > 50%: Tu modelo de IA respalda la operación confirmando que la tendencia matemática apunta a una subida.
+
     if (
         rsi < rsi_entrada
         and sma_50 > sma_200
         and prob_subida > probabilidad_minima
     ):
         return "COMPRA (BUY)"
+
+# Para que la función te diga que vendas, exige la tormenta perfecta bajista:
+# 1. RSI > 70: El precio ha subido demasiado rápido y está "caro" o sobrecomprado.
+# 2. SMA 50 < SMA 200: La tendencia general es bajista (Cruce de la Muerte), lo que sugiere presiones de venta a largo plazo.
+# 3. Probabilidad < 30%: La IA certifica que el escenario de subida es muy poco probable, apoyando la decisión de salir del activo o abrir una posición en corto.
+
     if (
         rsi > rsi_salida
         and sma_50 < sma_200
@@ -98,8 +118,6 @@ def generar_senal(
     ):
         return "VENTA (SELL)"
     return "MANTENER (HOLD)"
-
-
 # =========================================================
 # MÓDULO 5: BACKTESTING (Simulación de Rentabilidad)
 # =========================================================
@@ -123,6 +141,111 @@ def ejecutar_backtest(df):
     df['Capital_Estrategia'] = (1 + df['Retorno_Estrategia']).cumprod()
     
     return df.dropna()
+
+# =========================================================
+# MÓDULO 6: EJECUTAR ESTRATEGIA IA (Función principal)
+# =========================================================
+
+def ejecutar_estrategia(
+    ticker, fecha_inicio, fecha_fin,
+    rsi_entrada: float = 30.0, rsi_salida: float = 70.0,
+    probabilidad_minima: float = 0.50,
+    probabilidad_maxima_venta: float = 0.30,
+    periodo_media_corta: int = 50, periodo_media_larga: int = 200,
+):
+    """Entrena y evalúa la estrategia para el activo y período indicados."""
+    df_crudo = descargar_datos(ticker, fecha_inicio, fecha_fin)
+    if periodo_media_corta < 1 or periodo_media_larga < 1:
+        raise ValueError("Los períodos de las medias móviles deben ser positivos.")
+    if periodo_media_corta >= periodo_media_larga:
+        raise ValueError(
+            "El período de la media corta debe ser menor que el de la media larga."
+        )
+    df_indicadores = calcular_indicadores(
+        df_crudo, periodo_media_corta, periodo_media_larga
+    )
+
+    print("Preparando datos para la Inteligencia Artificial...")
+    df_indicadores['Target'] = (
+        df_indicadores['Close'].shift(-1) > df_indicadores['Close']
+    ).astype(int)
+    df_ml = df_indicadores.dropna().copy()
+
+    features = ['SMA_corta', 'SMA_larga', 'Volatilidad', 'RSI']
+    train_size = int(len(df_ml) * 0.8)
+    if train_size < 2 or len(df_ml) - train_size < 2:
+        raise ValueError(
+            "El período es demasiado corto para entrenar y probar la estrategia. "
+            "Selecciona un rango de fechas más amplio."
+        )
+
+    X_train = df_ml[features].iloc[:train_size]
+    y_train = df_ml['Target'].iloc[:train_size]
+    X_test = df_ml[features].iloc[train_size:]
+    if y_train.nunique() < 2:
+        raise ValueError(
+            "Los datos de entrenamiento no contienen subidas y bajadas suficientes. "
+            "Prueba con otro período."
+        )
+
+    print("Entrenando el modelo Random Forest...")
+    modelo_ia = RandomForestClassifier(
+        n_estimators=100, max_depth=5, random_state=42
+    )
+    modelo_ia.fit(X_train, y_train)
+
+    df_ml['Prob_Subida'] = np.nan
+    df_ml.loc[X_test.index, 'Prob_Subida'] = modelo_ia.predict_proba(X_test)[:, 1]
+
+    print("Generando señales de trading en base a las predicciones...")
+
+    df_ml['Recomendacion'] = df_ml.apply(
+        lambda fila: generar_senal(
+            fila['SMA_corta'], fila['SMA_larga'],
+            fila['Prob_Subida'], fila['RSI'], rsi_entrada, rsi_salida,
+            probabilidad_minima, probabilidad_maxima_venta,
+        ),
+        axis=1,
+    )
+    df_ml['Senal_Trading'] = df_ml['Recomendacion'].map(
+        {
+            "COMPRA (BUY)": 1,
+            "VENTA (SELL)": -1,
+            "MANTENER (HOLD)": 0,
+        }
+    )
+
+    df_prueba = df_ml.iloc[train_size:].copy()
+    recomendacion_manana = df_prueba['Recomendacion'].iloc[-1]
+    probabilidad_subida = float(df_prueba['Prob_Subida'].iloc[-1])
+    ultima_senal_trading = int(df_prueba['Senal_Trading'].iloc[-1])
+    print(f"Recomendación para mañana: {recomendacion_manana}")
+    print(f"Probabilidad estimada de subida: {probabilidad_subida:.2%}")
+    print(f"Último valor de Senal_Trading: {ultima_senal_trading}")
+    df_resultados = ejecutar_backtest(df_prueba)
+    if df_resultados.empty:
+        raise ValueError(
+            "No hay suficientes resultados para mostrar. "
+            "Selecciona un rango de fechas más amplio."
+        )
+
+    grafico = graficar_resultados(
+        df_resultados, ticker, recomendacion_manana,
+        rsi_entrada, rsi_salida,
+        periodo_media_corta, periodo_media_larga,
+        probabilidad_minima, probabilidad_maxima_venta,
+    )
+    rentabilidad_mercado = (
+        df_resultados['Capital_Mercado'].iloc[-1] - 1
+    ) * 100
+    rentabilidad_estrategia = (
+        df_resultados['Capital_Estrategia'].iloc[-1] - 1
+    ) * 100
+    return (
+        grafico, rentabilidad_mercado, rentabilidad_estrategia,
+        probabilidad_subida, ultima_senal_trading,
+    )
+
 
 # =========================================================
 # MÓDULO 6: VISUALIZACIÓN DE RESULTADOS
@@ -232,101 +355,3 @@ def graficar_resultados(
     figura.savefig(imagen, format="png", bbox_inches="tight")
     plt.close(figura)
     return base64.b64encode(imagen.getvalue()).decode("ascii")
-
-
-# =========================================================
-# MÓDULO 6: EJECUTAR ESTRATEGIA (Función principal)
-# =========================================================
-
-def ejecutar_estrategia(
-    ticker, fecha_inicio, fecha_fin,
-    rsi_entrada: float = 30.0, rsi_salida: float = 70.0,
-    probabilidad_minima: float = 0.50,
-    probabilidad_maxima_venta: float = 0.30,
-    periodo_media_corta: int = 50, periodo_media_larga: int = 200,
-):
-    """Entrena y evalúa la estrategia para el activo y período indicados."""
-    df_crudo = descargar_datos(ticker, fecha_inicio, fecha_fin)
-    if periodo_media_corta < 1 or periodo_media_larga < 1:
-        raise ValueError("Los períodos de las medias móviles deben ser positivos.")
-    if periodo_media_corta >= periodo_media_larga:
-        raise ValueError(
-            "El período de la media corta debe ser menor que el de la media larga."
-        )
-    df_indicadores = calcular_indicadores(
-        df_crudo, periodo_media_corta, periodo_media_larga
-    )
-
-    print("Preparando datos para la Inteligencia Artificial...")
-    df_indicadores['Target'] = (
-        df_indicadores['Close'].shift(-1) > df_indicadores['Close']
-    ).astype(int)
-    df_ml = df_indicadores.dropna().copy()
-
-    features = ['SMA_corta', 'SMA_larga', 'Volatilidad', 'RSI']
-    train_size = int(len(df_ml) * 0.8)
-    if train_size < 2 or len(df_ml) - train_size < 2:
-        raise ValueError(
-            "El período es demasiado corto para entrenar y probar la estrategia. "
-            "Selecciona un rango de fechas más amplio."
-        )
-
-    X_train = df_ml[features].iloc[:train_size]
-    y_train = df_ml['Target'].iloc[:train_size]
-    X_test = df_ml[features].iloc[train_size:]
-    if y_train.nunique() < 2:
-        raise ValueError(
-            "Los datos de entrenamiento no contienen subidas y bajadas suficientes. "
-            "Prueba con otro período."
-        )
-
-    print("Entrenando el modelo Random Forest...")
-    modelo_ia = RandomForestClassifier(
-        n_estimators=100, max_depth=5, random_state=42
-    )
-    modelo_ia.fit(X_train, y_train)
-
-    df_ml['Prob_Subida'] = np.nan
-    df_ml.loc[X_test.index, 'Prob_Subida'] = modelo_ia.predict_proba(X_test)[:, 1]
-
-    print("Generando señales de trading en base a las predicciones...")
-
-    df_ml['Recomendacion'] = df_ml.apply(
-        lambda fila: generar_senal(
-            fila['SMA_corta'], fila['SMA_larga'],
-            fila['Prob_Subida'], fila['RSI'], rsi_entrada, rsi_salida,
-            probabilidad_minima, probabilidad_maxima_venta,
-        ),
-        axis=1,
-    )
-    df_ml['Senal_Trading'] = df_ml['Recomendacion'].map(
-        {
-            "COMPRA (BUY)": 1,
-            "VENTA (SELL)": -1,
-            "MANTENER (HOLD)": 0,
-        }
-    )
-
-    df_prueba = df_ml.iloc[train_size:].copy()
-    recomendacion_manana = df_prueba['Recomendacion'].iloc[-1]
-    print(f"Recomendación para mañana: {recomendacion_manana}")
-    df_resultados = ejecutar_backtest(df_prueba)
-    if df_resultados.empty:
-        raise ValueError(
-            "No hay suficientes resultados para mostrar. "
-            "Selecciona un rango de fechas más amplio."
-        )
-
-    grafico = graficar_resultados(
-        df_resultados, ticker, recomendacion_manana,
-        rsi_entrada, rsi_salida,
-        periodo_media_corta, periodo_media_larga,
-        probabilidad_minima, probabilidad_maxima_venta,
-    )
-    rentabilidad_mercado = (
-        df_resultados['Capital_Mercado'].iloc[-1] - 1
-    ) * 100
-    rentabilidad_estrategia = (
-        df_resultados['Capital_Estrategia'].iloc[-1] - 1
-    ) * 100
-    return grafico, rentabilidad_mercado, rentabilidad_estrategia

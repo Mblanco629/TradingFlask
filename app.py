@@ -79,7 +79,10 @@ def inicio():
 
         if error is None:
             try:
-                grafico, rentabilidad_mercado, rentabilidad_estrategia = (
+                (
+                    grafico, rentabilidad_mercado, rentabilidad_estrategia,
+                    probabilidad_subida, ultima_senal_trading,
+                ) = (
                     ejecutar_estrategia(
                         valores["ticker"],
                         valores["fecha_inicio"],
@@ -96,6 +99,8 @@ def inicio():
                     "grafico": grafico,
                     "rentabilidad_mercado": rentabilidad_mercado,
                     "rentabilidad_estrategia": rentabilidad_estrategia,
+                    "probabilidad_subida": probabilidad_subida * 100,
+                    "ultima_senal_trading": ultima_senal_trading,
                 }
             except ValueError as exc:
                 error = str(exc)
