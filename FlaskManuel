@@ -1,0 +1,78 @@
+from flask import Flask, redirect, render_template, request, url_for
+
+app = Flask(__name__, template_folder='.')
+
+usuarios = {}
+
+
+@app.route('/')
+def index():
+    return render_template('main.html')
+
+
+@app.route('/login', methods=['POST'])
+def login():
+    user = request.form.get('user', '').strip()
+    password = request.form.get('password', '').strip()
+
+    if not user or not password:
+        return 'Usuario o contraseña incorrectos.'
+
+    if user not in usuarios:
+        usuarios[user] = {'user': user, 'password': password, 'estrategias': []}
+    else:
+        usuarios[user]['password'] = password
+
+    return redirect(url_for('panelpersonal', username=user))
+
+
+@app.route('/RecolectorEstrategias/<username>', methods=['GET', 'POST'])
+def recolector_estrategias(username):
+    usuario = usuarios.get(username)
+    if usuario is None:
+        return 'Usuario no encontrado.', 404
+
+    if request.method == 'POST':
+        indicador = request.form.getlist('indicator')
+        config = {'user': username}
+
+        for item in indicador:
+            nombre = item.upper()
+            valor = request.form.get(f'{item.lower()}_period')
+            if valor:
+                config[f'{nombre}'] = valor
+
+        if request.form.get('rsi_period'):
+            config['RSI'] = request.form.get('rsi_period')
+        if request.form.get('ema_period'):
+            config['EMA'] = request.form.get('ema_period')
+        if request.form.get('atr_period'):
+            config['ATR'] = request.form.get('atr_period')
+        if request.form.get('volumen_min'):
+            config['VOLUMEN'] = request.form.get('volumen_min')
+
+        config['compra'] = request.form.get('buy_signal', '')
+        config['venta'] = request.form.get('sell_signal', '')
+        config['valor_compra'] = request.form.get('buy_value', '')
+        config['valor_venta'] = request.form.get('sell_value', '')
+        config['activo'] = request.form.get('activo', '')
+        config['timeframe'] = request.form.get('timeframe', '')
+
+        usuario['estrategias'].append(config)
+        return redirect(url_for('panelpersonal', username=username))
+
+    return render_template('RecolectorEstrategias.html', username=username, estrategia=None, guardadas=usuario['estrategias'])
+
+
+@app.route('/panelpersonal/<username>', methods=['GET'])
+def panelpersonal(username):
+    usuario = usuarios.get(username)
+    if usuario is None:
+        return 'Usuario no encontrado.', 404
+
+    estrategias = usuario.get('estrategias', [])
+    return render_template('panelpersonal.html', username=username, estrategias=estrategias)
+
+
+if __name__ == '__main__':
+    app.run(debug=True, port=501)
