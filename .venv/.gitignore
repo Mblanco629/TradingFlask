@@ -1,0 +1,35 @@
+*# --- Entornos Virtuales ---
+# Evita subir las librerías instaladas localmente
+venv/
+.venv/
+env/
+ENV/
+
+# --- Caché de Python ---
+# Carpetas que Python genera automáticamente al ejecutar el código
+**/__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# --- Variables de Entorno y Configuración Secreta ---
+# NUNCA subas tus contraseñas, claves secretas o tokens
+.env
+.env.local
+instance/
+config.py
+
+# --- IDEs y Editores de Código ---
+# Configuraciones específicas de tus programas de desarrollo
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.swp
+
+# --- Sistema Operativo ---
+# Archivos basura del sistema
+.DS_Store
+Thumbs.db
