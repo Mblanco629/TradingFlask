@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="dark">
+    <title>Indicadores técnicos | TradingFlask</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles_ilai.css') }}">
+</head>
+<body>
+<main>
+    <section class="card">
+        <p class="eyebrow">ANÁLISIS DE MERCADO</p>
+        <h1>Indicadores Técnicos</h1>
+        <p>Consulta los datos del mercado y los indicadores calculados para una fecha.</p>
+
+        <form method="post">
+            <label for="ticker">
+                Ticker
+                <input id="ticker" name="ticker" value="{{ valores.ticker }}"
+                       placeholder="SAN.MC" required>
+            </label>
+            <label for="fecha">
+                Fecha de consulta
+                <input id="fecha" name="fecha" type="date"
+                       value="{{ valores.fecha }}" max="{{ hoy }}" required>
+            </label>
+            <button type="submit">Consultar indicadores</button>
+        </form>
+
+        {% if error %}
+        <p class="error" role="alert">{{ error }}</p>
+        {% endif %}
+
+        {% if resultado %}
+        <section class="results" aria-labelledby="resultado-titulo">
+            <h2 id="resultado-titulo">
+                {{ resultado.ticker }} · {{ resultado.fecha }}
+            </h2>
+            <div class="indicator-grid">
+                {% for nombre, valor in resultado.datos.items() %}
+                <article class="indicator-card">
+                    <h3>{{ nombre }}</h3>
+                    <p>
+                        {% if nombre == "Volumen" or nombre == "Volumen medio (20 sesiones)" %}
+                            {{ "{:,.0f}".format(valor) }}
+                        {% else %}
+                            {{ "{:,.2f}".format(valor) }}
+                        {% endif %}
+                    </p>
+                </article>
+                {% endfor %}
+            </div>
+        </section>
+        {% endif %}
+
+        <p class="page-navigation">
+            <a href="{{ url_for('portada') }}">Volver al inicio</a>
+        </p>
+    </section>
+</main>
+</body>
+</html>

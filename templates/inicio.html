@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="dark">
+    <title>TradingFlask | Inicio</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles_ilai.css') }}">
+</head>
+<body>
+<main class="landing">
+    <section class="card landing-card" aria-labelledby="titulo-principal">
+        <p class="eyebrow">TRADINGFLASK</p>
+        <h1 id="titulo-principal">Análisis de mercados</h1>
+        <p class="landing-description">
+            Explora indicadores técnicos y evalúa estrategias de inversión.
+        </p>
+
+        <div class="datetime-panel" aria-label="Fecha y hora actuales">
+            <div>
+                <span class="datetime-label">Fecha</span>
+                <time id="fecha-actual"></time>
+            </div>
+            <div>
+                <span class="datetime-label">Hora local</span>
+                <time id="hora-actual"></time>
+            </div>
+        </div>
+
+        <nav class="menu" aria-label="Menú principal">
+            <a class="menu-option" href="{{ url_for('indicadores_tecnicos') }}">
+                <span class="menu-option-content">
+                    <span class="menu-option-title">Indicadores Técnicos</span>
+                    <span class="menu-option-description">
+                        Consulta y analiza indicadores del mercado.
+                    </span>
+                </span>
+                <span class="menu-arrow" aria-hidden="true">&rarr;</span>
+            </a>
+            <a class="menu-option" href="{{ url_for('estrategia_v2') }}">
+                <span class="menu-option-content">
+                    <span class="menu-option-title">EstrategiaV2</span>
+                    <span class="menu-option-description">
+                        Ejecuta un backtest con parámetros configurables.
+                    </span>
+                </span>
+                <span class="menu-arrow" aria-hidden="true">&rarr;</span>
+            </a>
+        </nav>
+    </section>
+</main>
+<script>
+    const dateFormatter = new Intl.DateTimeFormat("es-ES", {
+        dateStyle: "full"
+    });
+    const timeFormatter = new Intl.DateTimeFormat("es-ES", {
+        timeStyle: "medium"
+    });
+
+    function actualizarFechaHora() {
+        const ahora = new Date();
+        document.getElementById("fecha-actual").textContent =
+            dateFormatter.format(ahora);
+        document.getElementById("hora-actual").textContent =
+            timeFormatter.format(ahora);
+    }
+
+    actualizarFechaHora();
+    setInterval(actualizarFechaHora, 200);
+</script>
+</body>
+</html>

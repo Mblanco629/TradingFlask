@@ -1,69 +1,12 @@
-import yfinance as yf
 import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from sklearn.ensemble import RandomForestClassifier
-
-
-# =========================================================
-# MÓDULO 1: RECOPILACIÓN DE DATOS
-# =========================================================
-def descargar_datos(ticker, fecha_inicio, fecha_fin):
-    """Descarga el histórico OHLCV desde Yahoo Finance."""
-    print(f"Descargando datos de {ticker}...")
-    df = yf.download(ticker, start=fecha_inicio, end=fecha_fin)
-    
-    # yfinance devuelve múltiples niveles en las columnas a veces, simplificamos:
-    if isinstance(df.columns, pd.MultiIndex):
-        df.columns = df.columns.droplevel(1)
-        
-    # Nos quedamos solo con las columnas esenciales
-    if df.empty:
-        raise ValueError(
-            f"No se encontraron datos para {ticker} en el período indicado."
-        )
-
-    df = df[['Open', 'High', 'Low', 'Close', 'Volume']]
-    return df.dropna()
+from CargaDatos import calcular_indicadores, descargar_datos
 
 # =========================================================
-# MÓDULO 2: CALCULO DE INDICADORES TÉCNICOS
-# =========================================================
-def calcular_indicadores(
-    df, periodo_media_corta: int = 50, periodo_media_larga: int = 200,
-):
-    """Añade indicadores matemáticos al DataFrame crudo."""
-    print("Calculando indicadores técnicos...")
-    df = df.copy()
-    
-    # 1. Medias Móviles Simples (SMA)
-    df['SMA_corta'] = df['Close'].rolling(window=periodo_media_corta).mean()
-    df['SMA_larga'] = df['Close'].rolling(window=periodo_media_larga).mean()
-    
-    # 2. Volatilidad (Desviación estándar de 20 días)
-    df['Volatilidad'] = df['Close'].rolling(window=20).std()
-
-    # 3. RSI de 14 períodos con suavizado de Wilder
-    cambios = df['Close'].diff()
-    ganancias = cambios.clip(lower=0)
-    perdidas = -cambios.clip(upper=0)
-    ganancia_media = ganancias.ewm(
-        alpha=1 / 14, min_periods=14, adjust=False
-    ).mean()
-    perdida_media = perdidas.ewm(
-        alpha=1 / 14, min_periods=14, adjust=False
-    ).mean()
-    fuerza_relativa = ganancia_media / perdida_media.replace(0, np.nan)
-    df['RSI'] = 100 - (100 / (1 + fuerza_relativa))
-    df.loc[(perdida_media == 0) & (ganancia_media > 0), 'RSI'] = 100
-    df.loc[(perdida_media == 0) & (ganancia_media == 0), 'RSI'] = 50
-    
-    # Eliminamos filas con valores nulos generados por los indicadores
-    return df.dropna()
-
-# =========================================================
-# 4. GENERACIÓN DE SEÑALES (Módulo 4)
+# GENERACIÓN DE SEÑALES
 # =========================================================
 def generar_senal(
     sma_50, sma_200, prob_subida, rsi,
@@ -113,8 +56,9 @@ def generar_senal(
     ):
         return "VENTA (SELL)"
     return "MANTENER (HOLD)"
+
 # =========================================================
-# MÓDULO 5: BACKTESTING (Simulación de Rentabilidad)
+# BACKTESTING (Simulación de Rentabilidad)
 # =========================================================
 def ejecutar_backtest(df):
     """Calcula el rendimiento de la estrategia frente a simplemente retener el activo."""
@@ -138,7 +82,7 @@ def ejecutar_backtest(df):
     return df.dropna()
 
 # =========================================================
-# MÓDULO 6: EJECUTAR ESTRATEGIA IA (Función principal)
+# EJECUTAR ESTRATEGIA IA (Función principal)
 # =========================================================
 
 def ejecutar_estrategia(
@@ -148,7 +92,64 @@ def ejecutar_estrategia(
     probabilidad_maxima_venta: float = 0.30,
     periodo_media_corta: int = 50, periodo_media_larga: int = 200,
 ):
-    """Entrena y evalúa la estrategia para el activo y período indicados."""
+    """Entrena y evalúa el backtest de la estrategia para un activo.
+
+    Descarga los datos OHLCV del ticker, calcula los indicadores técnicos y
+    prepara como objetivo si el cierre de la siguiente sesión será superior al
+    cierre actual. Divide los registros cronológicamente: el 80 % inicial se
+    usa para entrenar un clasificador Random Forest y el 20 % final para
+    generar probabilidades, recomendaciones y resultados del backtest. No se
+    mezclan aleatoriamente las observaciones.
+
+    Las señales se basan en las medias móviles, el RSI y la probabilidad
+    estimada de subida. El backtest compara la estrategia con mantener el
+    activo y retrasa un día la señal antes de aplicar los retornos, para evitar
+    usar una señal calculada al cierre como si se hubiera podido ejecutar
+    antes de ese cierre. También genera un gráfico interactivo con precios,
+    indicadores, señales y evolución del capital.
+
+    Args:
+        ticker: Símbolo del activo que se descarga desde Yahoo Finance, por
+            ejemplo ``"SAN.MC"``.
+        fecha_inicio: Fecha inicial del histórico, en el formato aceptado por
+            ``yfinance.download``.
+        fecha_fin: Fecha final del histórico, en el formato aceptado por
+            ``yfinance.download``.
+        rsi_entrada: Umbral inferior del RSI para considerar una compra.
+            Valor predeterminado: ``30.0``.
+        rsi_salida: Umbral superior del RSI para considerar una venta.
+            Valor predeterminado: ``70.0``.
+        probabilidad_minima: Probabilidad mínima de subida para habilitar una
+            compra, expresada como fracción entre 0 y 1 (por ejemplo, ``0.50``
+            equivale a 50 %).
+        probabilidad_maxima_venta: Probabilidad máxima de subida para habilitar
+            una venta, expresada como fracción entre 0 y 1 (por ejemplo,
+            ``0.30`` equivale a 30 %).
+        periodo_media_corta: Ventana de cálculo de la media móvil corta, en
+            sesiones. Debe ser positiva y menor que ``periodo_media_larga``.
+        periodo_media_larga: Ventana de cálculo de la media móvil larga, en
+            sesiones. Debe ser positiva y mayor que ``periodo_media_corta``.
+
+    Returns:
+        Una tupla de cinco elementos, en este orden:
+
+        * HTML del gráfico interactivo de Plotly, sin las etiquetas
+          ``<html>`` ni ``<body>``.
+        * Rentabilidad porcentual del mercado (estrategia Buy & Hold).
+        * Rentabilidad porcentual acumulada del backtest de la estrategia.
+        * Probabilidad estimada de subida para el último registro del período
+          de prueba, como fracción entre 0 y 1.
+        * Última señal de trading como entero: ``1`` para compra, ``-1`` para
+          venta y ``0`` para mantener.
+
+    Raises:
+        ValueError: Si los períodos de medias móviles no son positivos o su
+            orden es incorrecto, si no hay suficientes registros para separar
+            entrenamiento y prueba, si el entrenamiento contiene una sola
+            clase objetivo o si el backtest no produce resultados.
+        ValueError: También puede propagarse desde la descarga de datos cuando
+            no hay histórico disponible para el ticker y el período indicados.
+    """
     df_crudo = descargar_datos(ticker, fecha_inicio, fecha_fin)
     if periodo_media_corta < 1 or periodo_media_larga < 1:
         raise ValueError("Los períodos de las medias móviles deben ser positivos.")
@@ -243,7 +244,7 @@ def ejecutar_estrategia(
 
 
 # =========================================================
-# MÓDULO 6: VISUALIZACIÓN DE RESULTADOS
+# VISUALIZACIÓN DE RESULTADOS
 # =========================================================
 def graficar_resultados(
     df, ticker, recomendacion_manana,
@@ -255,11 +256,11 @@ def graficar_resultados(
     """Genera un gráfico interactivo con señales e indicadores de la estrategia."""
     print("Generando gráficos...")
     figura = make_subplots(
-        rows=4, cols=1, shared_xaxes=True, vertical_spacing=0.06,
-        row_heights=[0.4, 0.2, 0.2, 0.2],
+        rows=5, cols=1, shared_xaxes=True, vertical_spacing=0.05,
+        row_heights=[0.34, 0.16, 0.16, 0.16, 0.18],
         subplot_titles=(
-            'Precio y señales', 'RSI (14)',
-            'Probabilidad de subida', 'Capital acumulado',
+            'Precio, señales y bandas Bollinger', 'RSI (14)',
+            'Probabilidad de subida', 'Capital acumulado', 'Volumen',
         ),
     )
 
@@ -283,6 +284,31 @@ def graficar_resultados(
             x=df.index, y=df['SMA_larga'], mode='lines',
             name=f'Media móvil larga ({periodo_media_larga})',
             line={'color': 'purple'},
+        ),
+        row=1, col=1,
+    )
+    figura.add_trace(
+        go.Scatter(
+            x=df.index, y=df['Bollinger_Inferior'], mode='lines',
+            name='Banda Bollinger inferior',
+            line={'color': 'rgba(72, 167, 255, 0.45)', 'width': 1},
+        ),
+        row=1, col=1,
+    )
+    figura.add_trace(
+        go.Scatter(
+            x=df.index, y=df['Bollinger_Superior'], mode='lines',
+            name='Banda Bollinger superior',
+            line={'color': 'rgba(72, 167, 255, 0.45)', 'width': 1},
+            fill='tonexty', fillcolor='rgba(72, 167, 255, 0.10)',
+        ),
+        row=1, col=1,
+    )
+    figura.add_trace(
+        go.Scatter(
+            x=df.index, y=df['Bollinger_Media'], mode='lines',
+            name='Media Bollinger (20)',
+            line={'color': 'rgba(72, 167, 255, 0.8)', 'width': 1},
         ),
         row=1, col=1,
     )
@@ -368,6 +394,21 @@ def graficar_resultados(
         ),
         row=4, col=1,
     )
+    figura.add_trace(
+        go.Bar(
+            x=df.index, y=df['Volume'], name='Volumen',
+            marker_color='rgba(72, 167, 255, 0.45)',
+        ),
+        row=5, col=1,
+    )
+    figura.add_trace(
+        go.Scatter(
+            x=df.index, y=df['Volumen_Medio_20'], mode='lines',
+            name='Volumen medio (20 sesiones)',
+            line={'color': 'orange', 'width': 2},
+        ),
+        row=5, col=1,
+    )
 
     figura.update_layout(
         title=f'Señales de trading y backtest ({ticker})',
@@ -377,7 +418,8 @@ def graficar_resultados(
     )
     figura.update_yaxes(title_text='Precio', row=1, col=1)
     figura.update_yaxes(title_text='Multiplicador', row=4, col=1)
-    figura.update_xaxes(title_text='Fecha', row=4, col=1)
+    figura.update_yaxes(title_text='Acciones', row=5, col=1)
+    figura.update_xaxes(title_text='Fecha', row=5, col=1)
     figura.update_xaxes(showgrid=True)
     figura.update_yaxes(showgrid=True)
 

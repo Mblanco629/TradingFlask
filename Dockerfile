@@ -9,9 +9,11 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY app.py EstrategiaV2.py ./
+COPY run.py ./
+COPY .vscode/app.py .vscode/EstrategiaV2.py .vscode/CargaDatos.py ./.vscode/
 COPY templates ./templates
+COPY static ./static
 
 EXPOSE 5000
 
-CMD ["sh", "-c", "gunicorn --bind 0.0.0.0:${PORT:-5000} app:app"]
+CMD ["sh", "-c", "gunicorn --bind 0.0.0.0:${PORT:-5000} run:app"]
