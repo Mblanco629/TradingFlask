@@ -10,7 +10,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY run.py ./
-COPY .vscode/app.py .vscode/EstrategiaV2.py .vscode/CargaDatos.py ./.vscode/
+COPY .vscode/ ./.vscode/
 COPY templates ./templates
 COPY static ./static
 
