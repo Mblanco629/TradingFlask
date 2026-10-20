@@ -7,10 +7,10 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /app
 
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir --requirement requirements.txt
 
 COPY run.py ./
-COPY .vscode/ ./.vscode/
+COPY .vscode/app.py .vscode/CargaDatos.py .vscode/EstrategiaV2.py ./.vscode/
 COPY templates ./templates
 COPY static ./static
 
