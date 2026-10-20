@@ -1,14 +1,8 @@
-<!doctype html>
-<html lang="es">
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="color-scheme" content="dark">
-    <title>Indicadores técnicos | TradingFlask</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles_ilai.css') }}">
-</head>
-<body>
-<main>
+{% extends "principal.html" %}
+
+{% block title %}Indicadores técnicos | TradingFlask{% endblock %}
+
+{% block content %}
     <section class="card">
         <p class="eyebrow">ANÁLISIS DE MERCADO</p>
         <h1>Indicadores Técnicos</h1>
@@ -58,6 +52,4 @@
             <a href="{{ url_for('portada') }}">Volver al inicio</a>
         </p>
     </section>
-</main>
-</body>
-</html>
+{% endblock %}

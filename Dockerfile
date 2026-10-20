@@ -6,14 +6,15 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-COPY requirements.txt .
-RUN pip install --no-cache-dir --requirement requirements.txt
+COPY requirements.txt /app/requirements.txt
+RUN pip install --no-cache-dir --disable-pip-version-check \
+    --requirement /app/requirements.txt
 
-COPY run.py ./
-COPY .vscode/app.py .vscode/CargaDatos.py .vscode/EstrategiaV2.py ./.vscode/
-COPY templates ./templates
-COPY static ./static
+COPY app.py /app/app.py
+COPY src/ /app/src/
+COPY templates/ /app/templates/
+COPY static/ /app/static/
 
 EXPOSE 5000
 
-CMD ["sh", "-c", "gunicorn --bind 0.0.0.0:${PORT:-5000} run:app"]
+CMD ["sh", "-c", "exec gunicorn --bind 0.0.0.0:${PORT:-5000} app:app"]

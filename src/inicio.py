@@ -13,10 +13,17 @@ from datetime import date, datetime, timedelta
 
 from flask import Flask, render_template, request
 
-from EstrategiaV2 import ejecutar_estrategia
-from CargaDatos import calcular_indicadores, descargar_datos
+from .CargaDatos import calcular_indicadores, descargar_datos
+from .EstrategiaV2 import ejecutar_estrategia
 
 app = Flask(__name__, template_folder="../templates", static_folder="../static")
+
+
+@app.context_processor
+def contexto_plantillas():
+    """Proporciona el año actual al pie común de las plantillas."""
+    return {"current_year": date.today().year}
+
 
 @app.route("/")
 def portada():

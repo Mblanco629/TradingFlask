@@ -3,7 +3,7 @@ import numpy as np
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from sklearn.ensemble import RandomForestClassifier
-from CargaDatos import calcular_indicadores, descargar_datos
+from .CargaDatos import calcular_indicadores, descargar_datos
 
 # =========================================================
 # GENERACIÓN DE SEÑALES

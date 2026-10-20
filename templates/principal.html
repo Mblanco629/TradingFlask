@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="dark">
+    <title>{% block title %}TradingFlask{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles_ilai.css') }}">
+    {% block head %}{% endblock %}
+</head>
+<body>
+<header class="site-header">
+    <div class="site-header-inner">
+        <a class="site-logo" href="{{ url_for('portada') }}" aria-label="TradingFlask, inicio">
+            <svg class="site-logo-mark" viewBox="0 0 40 40" aria-hidden="true">
+                <rect x="3" y="22" width="7" height="15" rx="2"></rect>
+                <rect x="16" y="14" width="7" height="23" rx="2"></rect>
+                <rect x="29" y="4" width="7" height="33" rx="2"></rect>
+                <path d="M4 17 17 10l9 4L36 3"></path>
+            </svg>
+            <span>Trading<span class="site-logo-accent">Flask</span></span>
+        </a>
+        <nav class="site-nav" aria-label="Menú principal">
+            <a href="{{ url_for('portada') }}"
+               {% if request.endpoint == 'portada' %}aria-current="page"{% endif %}>
+                Inicio
+            </a>
+            <a href="{{ url_for('indicadores_tecnicos') }}"
+               {% if request.endpoint == 'indicadores_tecnicos' %}aria-current="page"{% endif %}>
+                Indicadores Técnicos
+            </a>
+            <a href="{{ url_for('estrategia_v2') }}"
+               {% if request.endpoint == 'estrategia_v2' %}aria-current="page"{% endif %}>
+                EstrategiaV2
+            </a>
+        </nav>
+    </div>
+</header>
+
+<main class="site-main">
+    {% block content %}{% endblock %}
+</main>
+
+<footer class="site-footer">
+    <div class="site-footer-inner">
+        <span>&copy; {{ current_year }} TradingFlask</span>
+        <details class="legal-notice" id="aviso-legal">
+            <summary>Aviso Legal</summary>
+            <p>
+                La información y los resultados de análisis de este sitio tienen
+                carácter exclusivamente informativo y educativo. No constituyen
+                asesoramiento financiero ni una recomendación de compra o venta.
+                Los datos y backtests pueden contener errores y no garantizan
+                resultados futuros. Toda decisión de inversión es responsabilidad
+                del usuario.
+            </p>
+        </details>
+    </div>
+</footer>
+{% block scripts %}{% endblock %}
+</body>
+</html>

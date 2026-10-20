@@ -1,14 +1,9 @@
-<!doctype html>
-<html lang="es">
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="color-scheme" content="dark">
-    <title>TradingFlask | Inicio</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles_ilai.css') }}">
-</head>
-<body>
-<main class="landing">
+{% extends "principal.html" %}
+
+{% block title %}TradingFlask | Inicio{% endblock %}
+
+{% block content %}
+<section class="landing">
     <section class="card landing-card" aria-labelledby="titulo-principal">
         <p class="eyebrow">TRADINGFLASK</p>
         <h1 id="titulo-principal">Análisis de mercados</h1>
@@ -48,7 +43,9 @@
             </a>
         </nav>
     </section>
-</main>
+{% endblock %}
+
+{% block scripts %}
 <script>
     const dateFormatter = new Intl.DateTimeFormat("es-ES", {
         dateStyle: "full"
@@ -68,5 +65,4 @@
     actualizarFechaHora();
     setInterval(actualizarFechaHora, 200);
 </script>
-</body>
-</html>
+{% endblock %}

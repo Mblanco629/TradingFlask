@@ -1,13 +1,8 @@
-<!doctype html>
-<html lang="es">
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Backtesting de estrategia</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles_ilai.css') }}">
-</head>
-<body>
-<main>
+{% extends "principal.html" %}
+
+{% block title %}Backtesting de estrategia | TradingFlask{% endblock %}
+
+{% block content %}
     <section class="card">
         <h1>Backtesting de estrategia</h1>
         <p>Elige el activo y el período para ejecutar el análisis.</p>
@@ -93,6 +88,4 @@
         </section>
         {% endif %}
     </section>
-</main>
-</body>
-</html>
+{% endblock %}
