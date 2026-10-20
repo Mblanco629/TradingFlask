@@ -1,10 +1,10 @@
 {% extends "principal.html" %}
 
-{% block title %}Backtesting de estrategia | TradingFlask{% endblock %}
+{% block title %}{{ nombre_estrategia }} | TradingFlask{% endblock %}
 
 {% block content %}
     <section class="card">
-        <h1>Backtesting de estrategia</h1>
+        <h1>Backtesting {{ nombre_estrategia }}</h1>
         <p>Elige el activo y el período para ejecutar el análisis.</p>
         <form method="post">
             <label for="ticker">

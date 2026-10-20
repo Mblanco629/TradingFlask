@@ -14,6 +14,7 @@ from datetime import date, datetime, timedelta
 from flask import Flask, render_template, request
 
 from .CargaDatos import calcular_indicadores, descargar_datos
+from .EstrategiaV1 import ejecutar_estrategia as ejecutar_estrategia_v1
 from .EstrategiaV2 import ejecutar_estrategia
 
 app = Flask(__name__, template_folder="../templates", static_folder="../static")
@@ -134,11 +135,22 @@ def indicadores_tecnicos():
 
 @app.route("/estrategia-v2", methods=["GET", "POST"])
 def estrategia_v2():
+    """Ejecuta el backtest de EstrategiaV2."""
+    return _pagina_estrategia(ejecutar_estrategia, "EstrategiaV2")
+
+
+@app.route("/estrategia-v1", methods=["GET", "POST"])
+def estrategia_v1():
+    """Ejecuta el backtest de EstrategiaV1."""
+    return _pagina_estrategia(ejecutar_estrategia_v1, "EstrategiaV1")
+
+
+def _pagina_estrategia(funcion_estrategia, nombre_estrategia):
     """Muestra el formulario y procesa solicitudes de backtesting.
 
     En solicitudes POST valida el ticker, las fechas, los umbrales RSI y de
     probabilidad (entre 0 y 100), y los períodos de las medias móviles. Si los
-    datos son válidos, ejecuta la estrategia y prepara sus métricas y gráfico.
+    datos son válidos, ejecuta la estrategia indicada y prepara sus métricas y gráfico.
     El formulario, los errores y los resultados se renderizan en ``index.html``.
     """
     valores = {
@@ -215,7 +227,7 @@ def estrategia_v2():
                     grafico, rentabilidad_mercado, rentabilidad_estrategia,
                     probabilidad_subida, ultima_senal_trading,
                 ) = (
-                    ejecutar_estrategia(
+                    funcion_estrategia(
                         valores["ticker"],
                         valores["fecha_inicio"],
                         valores["fecha_fin"],
@@ -243,4 +255,5 @@ def estrategia_v2():
         error=error,
         resultado=resultado,
         hoy=date.today().isoformat(),
+        nombre_estrategia=nombre_estrategia,
     )

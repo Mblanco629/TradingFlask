@@ -33,6 +33,10 @@
                {% if request.endpoint == 'estrategia_v2' %}aria-current="page"{% endif %}>
                 EstrategiaV2
             </a>
+            <a href="{{ url_for('estrategia_v1') }}"
+               {% if request.endpoint == 'estrategia_v1' %}aria-current="page"{% endif %}>
+                EstrategiaV1
+            </a>
         </nav>
     </div>
 </header>
