@@ -55,6 +55,7 @@ URL_RSS_BME = (
     "https://www.bolsasymercados.es/es/"
     "sala-de-comunicacion/noticias.rss.xml"
 )
+URL_RSS_EXPANSION = "https://www.expansion.com/rss/portada.xml"
 app.config["SECRET_KEY"] = (
     os.environ.get("FLASK_SECRET_KEY") or secrets.token_hex(32)
 )
@@ -139,17 +140,33 @@ def contexto_plantillas():
 
 @app.route("/")
 def portada():
-    """Muestra las últimas cinco noticias publicadas en el RSS de BME."""
-    noticias = []
-    error_noticias = None
+    """Muestra las últimas cinco noticias de BME y EXPANSIÓN."""
+    noticias, error_noticias = _cargar_noticias(
+        URL_RSS_BME, "www.bolsasymercados.es", "BME"
+    )
+    noticias_expansion, error_noticias_expansion = _cargar_noticias(
+        URL_RSS_EXPANSION, "www.expansion.com", "EXPANSIÓN"
+    )
 
+    return render_template(
+        "inicio.html",
+        noticias=noticias,
+        error_noticias=error_noticias,
+        noticias_expansion=noticias_expansion,
+        error_noticias_expansion=error_noticias_expansion,
+    )
+
+
+def _cargar_noticias(url_feed, dominio, fuente):
+    """Devuelve hasta cinco noticias de un RSS, validando su dominio."""
     try:
-        respuesta = requests.get(URL_RSS_BME, timeout=(3.05, 10))
+        respuesta = requests.get(url_feed, timeout=(3.05, 10))
         respuesta.raise_for_status()
         canal = ET.fromstring(respuesta.content).find("channel")
         if canal is None:
             raise ET.ParseError("El feed no contiene un canal RSS.")
 
+        noticias = []
         for elemento in canal.findall("item"):
             titulo = elemento.findtext("title", "").strip()
             enlace = elemento.findtext("link", "").strip()
@@ -157,7 +174,7 @@ def portada():
             if (
                 not titulo
                 or destino.scheme != "https"
-                or destino.hostname != "www.bolsasymercados.es"
+                or destino.hostname != dominio
             ):
                 continue
             fecha_publicacion = elemento.findtext("pubDate", "").strip()
@@ -174,18 +191,17 @@ def portada():
             })
             if len(noticias) == 5:
                 break
+        return noticias, None
     except requests.RequestException:
-        app.logger.exception("No se pudo consultar el RSS de noticias de BME.")
-        error_noticias = "No se pudieron cargar las noticias de BME."
+        app.logger.exception(
+            "No se pudo consultar el RSS de noticias de %s.", fuente
+        )
+        return [], f"No se pudieron cargar las noticias de {fuente}."
     except ET.ParseError:
-        app.logger.exception("El RSS de noticias de BME no contiene XML válido.")
-        error_noticias = "El feed de noticias de BME no está disponible."
-
-    return render_template(
-        "inicio.html",
-        noticias=noticias,
-        error_noticias=error_noticias,
-    )
+        app.logger.exception(
+            "El RSS de noticias de %s no contiene XML válido.", fuente
+        )
+        return [], f"El feed de noticias de {fuente} no está disponible."
 
 
 @app.route("/registro", methods=["GET", "POST"])

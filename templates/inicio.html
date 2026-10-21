@@ -4,36 +4,73 @@
 
 {% block content %}
 <section class="landing">
-    <section class="card landing-card" aria-labelledby="titulo-principal">
-        <p class="eyebrow">TRADINGFLASK</p>
-        <h1 id="titulo-principal">Últimas noticias de BME</h1>
-        <p class="landing-description">
-            Las noticias más recientes publicadas por Bolsas y Mercados Españoles.
-        </p>
+    <p class="eyebrow">TRADINGFLASK · ACTUALIDAD FINANCIERA</p>
+    <div class="news-grid">
+        <section class="card landing-card" aria-labelledby="titulo-bme">
+            <h1 id="titulo-bme">Últimas noticias de BME</h1>
+            <p class="landing-description">
+                Las noticias más recientes publicadas por Bolsas y Mercados Españoles.
+            </p>
 
-        {% if error_noticias %}
-        <p class="error" role="alert">{{ error_noticias }}</p>
-        {% elif noticias %}
-        <ol class="news-list" aria-label="Cinco noticias recientes de BME">
-            {% for noticia in noticias %}
-            <li class="news-item">
-                <a href="{{ noticia.enlace }}" target="_blank"
-                   rel="noopener noreferrer">
-                    {{ noticia.titulo }}
-                </a>
-                {% if noticia.fecha %}
-                <time>{{ noticia.fecha }}</time>
-                {% endif %}
-            </li>
-            {% endfor %}
-        </ol>
-        {% else %}
-        <p>No hay noticias disponibles en el feed de BME.</p>
-        {% endif %}
+            {% if error_noticias %}
+            <p class="error" role="alert">{{ error_noticias }}</p>
+            {% elif noticias %}
+            <ol class="news-list" aria-label="Cinco noticias recientes de BME">
+                {% for noticia in noticias %}
+                <li class="news-item">
+                    <a href="{{ noticia.enlace }}" target="_blank"
+                       rel="noopener noreferrer">
+                        {{ noticia.titulo }}
+                    </a>
+                    {% if noticia.fecha %}
+                    <time>{{ noticia.fecha }}</time>
+                    {% endif %}
+                </li>
+                {% endfor %}
+            </ol>
+            {% else %}
+            <p>No hay noticias disponibles en el feed de BME.</p>
+            {% endif %}
 
-        <a class="news-source" href="https://www.bolsasymercados.es/es/sala-de-comunicacion/noticias.html"
-           target="_blank" rel="noopener noreferrer">
-            Ver todas las noticias en BME
-        </a>
-    </section>
+            <a class="news-source"
+               href="https://www.bolsasymercados.es/es/sala-de-comunicacion/noticias.html"
+               target="_blank" rel="noopener noreferrer">
+                Ver todas las noticias en BME
+            </a>
+        </section>
+
+        <section class="card landing-card" aria-labelledby="titulo-expansion">
+            <h2 id="titulo-expansion">Últimas noticias de EXPANSIÓN</h2>
+            <p class="landing-description">
+                Las noticias más recientes de la portada de EXPANSIÓN.
+            </p>
+
+            {% if error_noticias_expansion %}
+            <p class="error" role="alert">{{ error_noticias_expansion }}</p>
+            {% elif noticias_expansion %}
+            <ol class="news-list"
+                aria-label="Cinco noticias recientes de EXPANSIÓN">
+                {% for noticia in noticias_expansion %}
+                <li class="news-item">
+                    <a href="{{ noticia.enlace }}" target="_blank"
+                       rel="noopener noreferrer">
+                        {{ noticia.titulo }}
+                    </a>
+                    {% if noticia.fecha %}
+                    <time>{{ noticia.fecha }}</time>
+                    {% endif %}
+                </li>
+                {% endfor %}
+            </ol>
+            {% else %}
+            <p>No hay noticias disponibles en el feed de EXPANSIÓN.</p>
+            {% endif %}
+
+            <a class="news-source" href="https://www.expansion.com/"
+               target="_blank" rel="noopener noreferrer">
+                Ver todas las noticias en EXPANSIÓN
+            </a>
+        </section>
+    </div>
+</section>
 {% endblock %}
