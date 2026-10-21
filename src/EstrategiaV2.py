@@ -9,81 +9,129 @@ from .CargaDatos import calcular_indicadores, descargar_datos
 # GENERACIÓN DE SEÑALES
 # =========================================================
 def generar_senal(
-    sma_50, sma_200, prob_subida, rsi,
-    rsi_entrada: float = 30.0, rsi_salida: float = 70.0,
-    probabilidad_minima: float = 0.50,
-    probabilidad_maxima_venta: float = 0.30,
+    filtro_tendencia, filtro_momento, filtro_volatilidad, filtro_volumen,
 ):
-    """Combina la tendencia, la IA y el RSI para generar una recomendación."""
-
-#• Al inicio de los datos históricos, las medias móviles (como la sma_200) no tienen suficientes 
-# velas previas para calcularse y devuelven NaN. Si intentas operar con un NaN, 
-# el código fallaría. Ante la duda, la función adopta una postura segura y devuelve MANTENER.
-
-    if (
-        pd.isna(sma_50) or pd.isna(sma_200)
-        or pd.isna(prob_subida) or pd.isna(rsi)
-    ):
-        return "MANTENER (HOLD)"
-
-# • Qué hace: Si el RSI está en su rango normal (entre 30 y 70), significa que el mercado está en una zona de equilibrio o consolidación.
-# • Resultado: No se toma ninguna acción operativa. Directamente devuelve MANTENER, ahorrando tiempo de cómputo al no evaluar el resto de condiciones.
-
-    if rsi_entrada <= rsi <= rsi_salida:
-        return "MANTENER (HOLD)"
-
-# Para que la función te diga que compres, se tienen que cumplir las 3 condiciones estrictamente al mismo tiempo:
-# 1. RSI < 30: El precio ha caído rápido y el activo está "barato" o en sobreventa.
-# 2. SMA 50 > SMA 200: Existe una tendencia alcista de fondo (conocido como Cruce de Oro si ocurre recientemente). Esto asegura que no estás comprando un activo en caída libre infinita.
-# 3. Probabilidad > 50%: Tu modelo de IA respalda la operación confirmando que la tendencia matemática apunta a una subida.
-
-    if (
-        rsi < rsi_entrada
-        and sma_50 > sma_200
-        and prob_subida > probabilidad_minima
-    ):
+    """Genera compra unicamente cuando se cumplen los cuatro filtros."""
+    if all((
+        filtro_tendencia, filtro_momento,
+        filtro_volatilidad, filtro_volumen,
+    )):
         return "COMPRA (BUY)"
-
-# Para que la función te diga que vendas, exige la tormenta perfecta bajista:
-# 1. RSI > 70: El precio ha subido demasiado rápido y está "caro" o sobrecomprado.
-# 2. SMA 50 < SMA 200: La tendencia general es bajista (Cruce de la Muerte), lo que sugiere presiones de venta a largo plazo.
-# 3. Probabilidad < 30%: La IA certifica que el escenario de subida es muy poco probable, apoyando la decisión de salir del activo o abrir una posición en corto.
-
-    if (
-        rsi > rsi_salida
-        and sma_50 < sma_200
-        and prob_subida < probabilidad_maxima_venta
-    ):
-        return "VENTA (SELL)"
     return "MANTENER (HOLD)"
 
-# =========================================================
-# BACKTESTING (Simulación de Rentabilidad)
-# =========================================================
-def ejecutar_backtest(df):
-    """Calcula el rendimiento de la estrategia frente a simplemente retener el activo."""
-    print("Ejecutando simulación de backtesting...")
-    df = df.copy()
-    
-    # 1. Retorno diario del mercado (Buy & Hold)
-    # pct_change() calcula qué porcentaje subió o bajó el precio respecto a ayer
-    df['Retorno_Mercado'] = df['Close'].pct_change()
-    
-    # 2. Retorno de nuestra estrategia
-    # IMPORTANTE: shift(1) desplaza la señal un día. Si el algoritmo decide "Comprar" 
-    # hoy con los datos de cierre, la rentabilidad real se captura mañana. 
-    # Olvidar el shift(1) causa "look-ahead bias" (ver el futuro trampa).
-    df['Retorno_Estrategia'] = df['Senal_Trading'].shift(1) * df['Retorno_Mercado']
-    
-    # 3. Evolución del capital acumulado (Asumiendo que empezamos con capital = 1.0)
-    df['Capital_Mercado'] = (1 + df['Retorno_Mercado']).cumprod()
-    df['Capital_Estrategia'] = (1 + df['Retorno_Estrategia']).cumprod()
-    
-    return df.dropna()
 
 # =========================================================
-# EJECUTAR ESTRATEGIA IA (Función principal)
+# BACKTESTING (Simulacion de Rentabilidad)
 # =========================================================
+def ejecutar_backtest(df):
+    """Simula posiciones largas con stop, objetivo y salidas anticipadas."""
+    print("Ejecutando simulacion de backtesting...")
+    df = df.copy()
+    df['Retorno_Mercado'] = df['Close'].pct_change()
+    df['Retorno_Estrategia'] = 0.0
+    df['Senal_Trading'] = 0
+    df['Stop_Loss'] = np.nan
+    df['Take_Profit'] = np.nan
+    df['Precio_Salida'] = np.nan
+
+    en_posicion = False
+    entrada = riesgo = stop = objetivo = None
+    sobrecompra_alcanzada = False
+
+    for i in range(1, len(df)):
+        anterior = df.iloc[i - 1]
+        actual = df.iloc[i]
+
+        if not en_posicion and bool(anterior['Senal_Entrada']):
+            precio_entrada = float(anterior['Close'])
+            atr = anterior['ATR']
+            minimo_local = anterior['Minimo_Local']
+            if pd.notna(atr) and atr > 0:
+                niveles_stop = [precio_entrada - 1.5 * float(atr)]
+                if pd.notna(minimo_local):
+                    niveles_stop.append(
+                        float(minimo_local) - 0.1 * float(atr)
+                    )
+                niveles_validos = [
+                    nivel for nivel in niveles_stop
+                    if 0 < nivel < precio_entrada
+                ]
+                if niveles_validos:
+                    entrada = precio_entrada
+                    stop = max(niveles_validos)
+                    riesgo = entrada - stop
+                    objetivo = entrada + 2 * riesgo
+                    en_posicion = True
+                    sobrecompra_alcanzada = False
+                    df.loc[df.index[i - 1], 'Senal_Trading'] = 1
+                    df.loc[df.index[i - 1], 'Stop_Loss'] = stop
+                    df.loc[df.index[i - 1], 'Take_Profit'] = objetivo
+
+        if not en_posicion:
+            continue
+
+        indice_actual = df.index[i]
+        precio_cierre_previo = float(anterior['Close'])
+        apertura = float(actual['Open'])
+        minimo = float(actual['Low'])
+        maximo = float(actual['High'])
+        precio_salida = None
+
+        df.loc[indice_actual, 'Stop_Loss'] = stop
+        df.loc[indice_actual, 'Take_Profit'] = objetivo
+
+        if apertura <= stop:
+            precio_salida = apertura
+        elif apertura >= objetivo:
+            precio_salida = apertura
+        elif minimo <= stop:
+            precio_salida = stop
+        elif maximo >= objetivo:
+            precio_salida = objetivo
+        else:
+            if maximo >= entrada + riesgo:
+                stop = entrada
+            df.loc[indice_actual, 'Stop_Loss'] = stop
+            if minimo <= stop:
+                precio_salida = stop
+
+        if precio_salida is None:
+            rsi_actual = actual['RSI']
+            rsi_previo = anterior['RSI']
+            if pd.notna(rsi_actual) and rsi_actual >= 70:
+                sobrecompra_alcanzada = True
+
+            salida_rsi = (
+                sobrecompra_alcanzada
+                and pd.notna(rsi_actual)
+                and pd.notna(rsi_previo)
+                and rsi_actual < rsi_previo
+            )
+            salida_ema = (
+                pd.notna(actual['EMA_20'])
+                and actual['Close'] < actual['EMA_20']
+            )
+            if salida_rsi or salida_ema:
+                precio_salida = float(actual['Close'])
+
+        if precio_salida is not None:
+            df.loc[indice_actual, 'Retorno_Estrategia'] = (
+                precio_salida / precio_cierre_previo
+            ) - 1
+            df.loc[indice_actual, 'Senal_Trading'] = -1
+            df.loc[indice_actual, 'Precio_Salida'] = precio_salida
+            en_posicion = False
+            entrada = riesgo = stop = objetivo = None
+            sobrecompra_alcanzada = False
+        else:
+            df.loc[indice_actual, 'Retorno_Estrategia'] = (
+                float(actual['Close']) / precio_cierre_previo
+            ) - 1
+
+    df['Capital_Mercado'] = (1 + df['Retorno_Mercado']).cumprod()
+    df['Capital_Estrategia'] = (1 + df['Retorno_Estrategia']).cumprod()
+    return df.dropna(subset=['Retorno_Mercado'])
+
 
 def ejecutar_estrategia(
     ticker, fecha_inicio, fecha_fin,
@@ -101,12 +149,11 @@ def ejecutar_estrategia(
     generar probabilidades, recomendaciones y resultados del backtest. No se
     mezclan aleatoriamente las observaciones.
 
-    Las señales se basan en las medias móviles, el RSI y la probabilidad
-    estimada de subida. El backtest compara la estrategia con mantener el
-    activo y retrasa un día la señal antes de aplicar los retornos, para evitar
-    usar una señal calculada al cierre como si se hubiera podido ejecutar
-    antes de ese cierre. También genera un gráfico interactivo con precios,
-    indicadores, señales y evolución del capital.
+    Las entradas requieren precio sobre EMA 20/50, RSI entre 50 y 65,
+    expansion de Bollinger o ruptura de su banda superior, y ruptura del
+    maximo previo con rango amplio y volumen superior a su media de 20 sesiones.
+    El backtest aplica stop por minimo local o 1.5 ATR, objetivo 1:2,
+    breakeven al alcanzar 1R y salidas por RSI o cierre bajo EMA 20.
 
     Args:
         ticker: Símbolo del activo que se descarga desde Yahoo Finance, por
@@ -115,16 +162,10 @@ def ejecutar_estrategia(
             ``yfinance.download``.
         fecha_fin: Fecha final del histórico, en el formato aceptado por
             ``yfinance.download``.
-        rsi_entrada: Umbral inferior del RSI para considerar una compra.
-            Valor predeterminado: ``30.0``.
-        rsi_salida: Umbral superior del RSI para considerar una venta.
-            Valor predeterminado: ``70.0``.
-        probabilidad_minima: Probabilidad mínima de subida para habilitar una
-            compra, expresada como fracción entre 0 y 1 (por ejemplo, ``0.50``
-            equivale a 50 %).
-        probabilidad_maxima_venta: Probabilidad máxima de subida para habilitar
-            una venta, expresada como fracción entre 0 y 1 (por ejemplo,
-            ``0.30`` equivale a 30 %).
+        rsi_entrada, rsi_salida, probabilidad_minima,
+        probabilidad_maxima_venta: Parámetros conservados por compatibilidad
+            con el formulario común de estrategias; las reglas nuevas usan
+            niveles fijos de RSI y no filtran por la probabilidad de IA.
         periodo_media_corta: Ventana de cálculo de la media móvil corta, en
             sesiones. Debe ser positiva y menor que ``periodo_media_larga``.
         periodo_media_larga: Ventana de cálculo de la media móvil larga, en
@@ -161,6 +202,41 @@ def ejecutar_estrategia(
         df_crudo, periodo_media_corta, periodo_media_larga
     )
 
+    cierre_previo = df_indicadores['Close'].shift(1)
+    rango_verdadero = pd.concat(
+        [
+            df_indicadores['High'] - df_indicadores['Low'],
+            (df_indicadores['High'] - cierre_previo).abs(),
+            (df_indicadores['Low'] - cierre_previo).abs(),
+        ],
+        axis=1,
+    ).max(axis=1)
+    df_indicadores['ATR'] = rango_verdadero.rolling(
+        window=14, min_periods=14
+    ).mean()
+    df_indicadores['EMA_20'] = df_indicadores['Close'].ewm(
+        span=20, adjust=False, min_periods=20
+    ).mean()
+    df_indicadores['EMA_50'] = df_indicadores['Close'].ewm(
+        span=50, adjust=False, min_periods=50
+    ).mean()
+    df_indicadores['Minimo_Local'] = df_indicadores['Low'].shift(1).rolling(
+        window=5, min_periods=5
+    ).min()
+    df_indicadores['Ancho_Bollinger'] = (
+        df_indicadores['Bollinger_Superior']
+        - df_indicadores['Bollinger_Inferior']
+    ) / df_indicadores['Bollinger_Media']
+    umbral_compresion = df_indicadores['Ancho_Bollinger'].shift(1).rolling(
+        window=120, min_periods=20
+    ).quantile(0.2)
+    df_indicadores['Bollinger_Abriendose'] = (
+        df_indicadores['Ancho_Bollinger'].shift(1).le(umbral_compresion)
+        & df_indicadores['Ancho_Bollinger'].gt(
+            df_indicadores['Ancho_Bollinger'].shift(1)
+        )
+    )
+
     print("Preparando datos para la Inteligencia Artificial...")
     df_indicadores['Target'] = (
         df_indicadores['Close'].shift(-1) > df_indicadores['Close']
@@ -193,41 +269,49 @@ def ejecutar_estrategia(
     df_ml['Prob_Subida'] = np.nan
     df_ml.loc[X_test.index, 'Prob_Subida'] = modelo_ia.predict_proba(X_test)[:, 1]
 
-    print("Generando señales de trading en base a las predicciones...")
-
-    df_ml['Recomendacion'] = df_ml.apply(
-        lambda fila: generar_senal(
-            fila['SMA_corta'], fila['SMA_larga'],
-            fila['Prob_Subida'], fila['RSI'], rsi_entrada, rsi_salida,
-            probabilidad_minima, probabilidad_maxima_venta,
-        ),
-        axis=1,
+    print("Generando senales con los cuatro filtros...")
+    precio_rompe_banda = (
+        df_ml['Close'] > df_ml['Bollinger_Superior']
     )
-    df_ml['Senal_Trading'] = df_ml['Recomendacion'].map(
-        {
-            "COMPRA (BUY)": 1,
-            "VENTA (SELL)": -1,
-            "MANTENER (HOLD)": 0,
-        }
+    filtro_tendencia = (
+        (df_ml['Close'] > df_ml['EMA_20'])
+        & (df_ml['Close'] > df_ml['EMA_50'])
     )
+    filtro_momento = df_ml['RSI'].between(50, 65, inclusive='neither')
+    filtro_volatilidad = (
+        df_ml['Bollinger_Abriendose'] | precio_rompe_banda
+    )
+    filtro_volumen = (
+        (df_ml['Close'] > df_ml['High'].shift(1))
+        & ((df_ml['High'] - df_ml['Low']) >= df_ml['ATR'])
+        & (df_ml['Volume'] > df_ml['Volumen_Medio_20'])
+    )
+    df_ml['Recomendacion'] = [
+        generar_senal(tendencia, momento, volatilidad, volumen)
+        for tendencia, momento, volatilidad, volumen in zip(
+            filtro_tendencia, filtro_momento,
+            filtro_volatilidad, filtro_volumen,
+        )
+    ]
+    df_ml['Senal_Entrada'] = df_ml['Recomendacion'].eq("COMPRA (BUY)")
 
     df_prueba = df_ml.iloc[train_size:].copy()
-    recomendacion_manana = df_prueba['Recomendacion'].iloc[-1]
     probabilidad_subida = float(df_prueba['Prob_Subida'].iloc[-1])
-    ultima_senal_trading = int(df_prueba['Senal_Trading'].iloc[-1])
-    print(f"Recomendación para mañana: {recomendacion_manana}")
-    print(f"Probabilidad estimada de subida: {probabilidad_subida:.2%}")
-    print(f"Último valor de Senal_Trading: {ultima_senal_trading}")
     df_resultados = ejecutar_backtest(df_prueba)
     if df_resultados.empty:
         raise ValueError(
             "No hay suficientes resultados para mostrar. "
             "Selecciona un rango de fechas más amplio."
         )
+    ultima_senal_trading = int(df_resultados['Senal_Trading'].iloc[-1])
+    recomendacion_manana = df_prueba['Recomendacion'].iloc[-1]
+    print(f"Recomendacion para manana: {recomendacion_manana}")
+    print(f"Probabilidad estimada de subida: {probabilidad_subida:.2%}")
+    print(f"Ultimo valor de Senal_Trading: {ultima_senal_trading}")
 
     grafico = graficar_resultados(
         df_resultados, ticker, recomendacion_manana,
-        rsi_entrada, rsi_salida,
+        50.0, 65.0,
         periodo_media_corta, periodo_media_larga,
         probabilidad_minima, probabilidad_maxima_venta,
     )
@@ -248,7 +332,7 @@ def ejecutar_estrategia(
 # =========================================================
 def graficar_resultados(
     df, ticker, recomendacion_manana,
-    rsi_entrada: float = 30.0, rsi_salida: float = 70.0,
+    rsi_entrada: float = 50.0, rsi_salida: float = 65.0,
     periodo_media_corta: int = 50, periodo_media_larga: int = 200,
     probabilidad_minima: float = 0.50,
     probabilidad_maxima_venta: float = 0.30,
@@ -289,6 +373,20 @@ def graficar_resultados(
     )
     figura.add_trace(
         go.Scatter(
+            x=df.index, y=df['EMA_20'], mode='lines',
+            name='EMA 20', line={'color': 'blue', 'width': 1},
+        ),
+        row=1, col=1,
+    )
+    figura.add_trace(
+        go.Scatter(
+            x=df.index, y=df['EMA_50'], mode='lines',
+            name='EMA 50', line={'color': 'brown', 'width': 1},
+        ),
+        row=1, col=1,
+    )
+    figura.add_trace(
+        go.Scatter(
             x=df.index, y=df['Bollinger_Inferior'], mode='lines',
             name='Banda Bollinger inferior',
             line={'color': 'rgba(72, 167, 255, 0.45)', 'width': 1},
@@ -312,8 +410,23 @@ def graficar_resultados(
         ),
         row=1, col=1,
     )
+    figura.add_trace(
+        go.Scatter(
+            x=df.index, y=df['Stop_Loss'], mode='lines',
+            name='Stop Loss', line={'color': 'red', 'dash': 'dash'},
+        ),
+        row=1, col=1,
+    )
+    figura.add_trace(
+        go.Scatter(
+            x=df.index, y=df['Take_Profit'], mode='lines',
+            name='Take Profit (1:2)', line={'color': 'green', 'dash': 'dash'},
+        ),
+        row=1, col=1,
+    )
     compras = df[df['Senal_Trading'] == 1]
     ventas = df[df['Senal_Trading'] == -1]
+    ventas_cierre = ventas['Precio_Salida'].fillna(ventas['Close'])
     figura.add_trace(
         go.Scatter(
             x=compras.index, y=compras['Close'], mode='markers',
@@ -324,7 +437,7 @@ def graficar_resultados(
     )
     figura.add_trace(
         go.Scatter(
-            x=ventas.index, y=ventas['Close'], mode='markers',
+            x=ventas.index, y=ventas_cierre, mode='markers',
             name='Venta (SELL)',
             marker={'symbol': 'triangle-down', 'color': 'red', 'size': 10},
         ),
@@ -353,25 +466,17 @@ def graficar_resultados(
         annotation_text=f'Umbral de salida ({rsi_salida:g})',
         row=2, col=1,
     )
+    figura.add_hline(
+        y=70, line_dash='dot', line_color='darkred',
+        annotation_text='Salida RSI sobrecompra (70)',
+        row=2, col=1,
+    )
     figura.update_yaxes(title_text='RSI', range=[0, 100], row=2, col=1)
 
     figura.add_trace(
         go.Scatter(
             x=df.index, y=df['Prob_Subida'] * 100, mode='lines',
             name='Probabilidad de subida', line={'color': 'blue'},
-        ),
-        row=3, col=1,
-    )
-    figura.add_hline(
-        y=probabilidad_minima * 100, line_dash='dash', line_color='green',
-        annotation_text=f'Umbral de compra ({probabilidad_minima * 100:g}%)',
-        row=3, col=1,
-    )
-    figura.add_hline(
-        y=probabilidad_maxima_venta * 100, line_dash='dash',
-        line_color='red',
-        annotation_text=(
-            f'Umbral de venta ({probabilidad_maxima_venta * 100:g}%)'
         ),
         row=3, col=1,
     )

@@ -1,0 +1,26 @@
+{% extends "principal.html" %}
+
+{% block title %}Iniciar sesión | TradingFlask{% endblock %}
+
+{% block content %}
+<section class="card auth-card">
+    <h1>Iniciar sesión</h1>
+    <p>Accede al área privada de EstrategiaV2.</p>
+    <form method="post">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="next" value="{{ siguiente }}">
+        <label for="nombre_usuario">
+            Nombre de usuario
+            <input id="nombre_usuario" name="nombre_usuario" autocomplete="username"
+                   minlength="3" maxlength="40" required>
+        </label>
+        <label for="contrasena">
+            Contraseña
+            <input id="contrasena" name="contrasena" type="password"
+                   autocomplete="current-password" required>
+        </label>
+        <button type="submit">Iniciar sesión</button>
+    </form>
+    <p>¿No tienes cuenta? <a href="{{ url_for('registro') }}">Regístrate</a>.</p>
+</section>
+{% endblock %}

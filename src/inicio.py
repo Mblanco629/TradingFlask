@@ -1,7 +1,3 @@
-# Token de GITHUB Carpeta PythonFlask para despliegue en VPS.Modifico
-
-
-
 
 """Aplicación web Flask para herramientas de análisis bursátil.
 
@@ -9,27 +5,270 @@ Sirve la portada y el backtest de ``EstrategiaV2`` mediante las plantillas de
 ``templates/`` y los recursos de ``static/``, ubicados en la raíz del proyecto.
 """
 
+import hmac
+import os
+import secrets
+import sys
 from datetime import date, datetime, timedelta
+from email.utils import parsedate_to_datetime
+from pathlib import Path
+from urllib.parse import urljoin, urlparse
+import xml.etree.ElementTree as ET
 
-from flask import Flask, render_template, request
+import requests
+from flask import (
+    Flask,
+    abort,
+    flash,
+    redirect,
+    render_template,
+    request,
+    session,
+    url_for,
+)
+from flask_login import (
+    LoginManager,
+    UserMixin,
+    current_user,
+    login_required,
+    login_user,
+    logout_user,
+)
+from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy.exc import IntegrityError
+from werkzeug.security import check_password_hash, generate_password_hash
 
-from .CargaDatos import calcular_indicadores, descargar_datos
-from .EstrategiaV1 import ejecutar_estrategia as ejecutar_estrategia_v1
-from .EstrategiaV2 import ejecutar_estrategia
+if __package__ in {None, ""}:
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+    from src.CargaDatos import calcular_indicadores, descargar_datos
+    from src.EstrategiaV1 import ejecutar_estrategia as ejecutar_estrategia_v1
+    from src.EstrategiaV2 import ejecutar_estrategia
+else:
+    from .CargaDatos import calcular_indicadores, descargar_datos
+    from .EstrategiaV1 import ejecutar_estrategia as ejecutar_estrategia_v1
+    from .EstrategiaV2 import ejecutar_estrategia
 
 app = Flask(__name__, template_folder="../templates", static_folder="../static")
+URL_RSS_BME = (
+    "https://www.bolsasymercados.es/es/"
+    "sala-de-comunicacion/noticias.rss.xml"
+)
+app.config["SECRET_KEY"] = (
+    os.environ.get("FLASK_SECRET_KEY") or secrets.token_hex(32)
+)
+if not os.environ.get("FLASK_SECRET_KEY"):
+    app.logger.warning(
+        "FLASK_SECRET_KEY no está definida; las sesiones se invalidarán al reiniciar."
+    )
+os.makedirs(app.instance_path, exist_ok=True)
+database_path = os.path.join(app.instance_path, "tradingflask.sqlite").replace(
+    os.sep, "/"
+)
+app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{database_path}"
+app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+
+db = SQLAlchemy(app)
+login_manager = LoginManager()
+login_manager.login_view = "login"
+login_manager.login_message = "Inicia sesión para acceder a EstrategiaV2."
+login_manager.login_message_category = "error"
+login_manager.init_app(app)
+
+
+class Usuario(UserMixin, db.Model):
+    """Cuenta de acceso a las funciones privadas de la aplicación."""
+
+    id = db.Column(db.Integer, primary_key=True)
+    nombre_usuario = db.Column(db.String(40), unique=True, nullable=False)
+    contrasena_hash = db.Column(db.String(256), nullable=False)
+
+    def establecer_contrasena(self, contrasena):
+        self.contrasena_hash = generate_password_hash(contrasena)
+
+    def comprobar_contrasena(self, contrasena):
+        return check_password_hash(self.contrasena_hash, contrasena)
+
+
+with app.app_context():
+    db.create_all()
+
+
+@login_manager.user_loader
+def cargar_usuario(usuario_id):
+    """Recupera la cuenta guardada en la sesión."""
+    try:
+        return db.session.get(Usuario, int(usuario_id))
+    except (TypeError, ValueError):
+        return None
+
+
+def _token_csrf():
+    """Obtiene un token CSRF ligado a la sesión actual."""
+    if "_csrf_token" not in session:
+        session["_csrf_token"] = secrets.token_urlsafe(32)
+    return session["_csrf_token"]
+
+
+@app.before_request
+def validar_csrf():
+    """Rechaza envíos falsificados a los formularios de autenticación."""
+    if request.method == "POST" and request.endpoint in {
+        "login", "registro", "logout",
+    }:
+        token_esperado = session.get("_csrf_token", "")
+        token_recibido = request.form.get("csrf_token", "")
+        if not token_esperado or not hmac.compare_digest(
+            token_esperado, token_recibido
+        ):
+            abort(
+                400,
+                description="El formulario ha caducado. Vuelve a intentarlo.",
+            )
 
 
 @app.context_processor
 def contexto_plantillas():
     """Proporciona el año actual al pie común de las plantillas."""
-    return {"current_year": date.today().year}
+    return {
+        "current_year": date.today().year,
+        "csrf_token": _token_csrf,
+    }
 
 
 @app.route("/")
 def portada():
-    """Muestra la portada con enlaces a las herramientas disponibles."""
-    return render_template("inicio.html")
+    """Muestra las últimas cinco noticias publicadas en el RSS de BME."""
+    noticias = []
+    error_noticias = None
+
+    try:
+        respuesta = requests.get(URL_RSS_BME, timeout=(3.05, 10))
+        respuesta.raise_for_status()
+        canal = ET.fromstring(respuesta.content).find("channel")
+        if canal is None:
+            raise ET.ParseError("El feed no contiene un canal RSS.")
+
+        for elemento in canal.findall("item"):
+            titulo = elemento.findtext("title", "").strip()
+            enlace = elemento.findtext("link", "").strip()
+            destino = urlparse(enlace)
+            if (
+                not titulo
+                or destino.scheme != "https"
+                or destino.hostname != "www.bolsasymercados.es"
+            ):
+                continue
+            fecha_publicacion = elemento.findtext("pubDate", "").strip()
+            try:
+                fecha_publicacion = parsedate_to_datetime(
+                    fecha_publicacion
+                ).strftime("%d/%m/%Y %H:%M")
+            except (TypeError, ValueError, OverflowError):
+                fecha_publicacion = ""
+            noticias.append({
+                "titulo": titulo,
+                "enlace": enlace,
+                "fecha": fecha_publicacion,
+            })
+            if len(noticias) == 5:
+                break
+    except requests.RequestException:
+        app.logger.exception("No se pudo consultar el RSS de noticias de BME.")
+        error_noticias = "No se pudieron cargar las noticias de BME."
+    except ET.ParseError:
+        app.logger.exception("El RSS de noticias de BME no contiene XML válido.")
+        error_noticias = "El feed de noticias de BME no está disponible."
+
+    return render_template(
+        "inicio.html",
+        noticias=noticias,
+        error_noticias=error_noticias,
+    )
+
+
+@app.route("/registro", methods=["GET", "POST"])
+def registro():
+    """Crea una cuenta nueva y la autentica."""
+    if current_user.is_authenticated:
+        return redirect(url_for("portada"))
+
+    if request.method == "POST":
+        nombre_usuario = (
+            request.form.get("nombre_usuario", "").strip().casefold()
+        )
+        contrasena = request.form.get("contrasena", "")
+        if (
+            not 3 <= len(nombre_usuario) <= 40
+            or not nombre_usuario.replace("_", "").isalnum()
+        ):
+            flash(
+                "El usuario debe tener entre 3 y 40 caracteres alfanuméricos "
+                "o guiones bajos.",
+                "error",
+            )
+        elif len(contrasena) < 8:
+            flash("La contraseña debe tener al menos 8 caracteres.", "error")
+        elif db.session.scalar(
+            db.select(Usuario).where(Usuario.nombre_usuario == nombre_usuario)
+        ):
+            flash("Ese nombre de usuario ya está registrado.", "error")
+        else:
+            usuario = Usuario(nombre_usuario=nombre_usuario)
+            usuario.establecer_contrasena(contrasena)
+            db.session.add(usuario)
+            try:
+                db.session.commit()
+            except IntegrityError:
+                db.session.rollback()
+                flash("Ese nombre de usuario ya está registrado.", "error")
+            else:
+                session.pop("_csrf_token", None)
+                login_user(usuario)
+                flash("Tu cuenta se ha creado correctamente.", "success")
+                return redirect(url_for("estrategia_v2"))
+
+    return render_template("registro.html")
+
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    """Inicia sesión y devuelve al usuario al destino local solicitado."""
+    if current_user.is_authenticated:
+        return redirect(url_for("portada"))
+
+    siguiente = request.args.get("next") or request.form.get("next", "")
+    if request.method == "POST":
+        nombre_usuario = (
+            request.form.get("nombre_usuario", "").strip().casefold()
+        )
+        contrasena = request.form.get("contrasena", "")
+        usuario = db.session.scalar(
+            db.select(Usuario).where(Usuario.nombre_usuario == nombre_usuario)
+        )
+        if usuario is None or not usuario.comprobar_contrasena(contrasena):
+            flash("Usuario o contraseña incorrectos.", "error")
+        else:
+            session.pop("_csrf_token", None)
+            login_user(usuario)
+            destino = urlparse(urljoin(request.host_url, siguiente))
+            if (
+                destino.scheme in {"http", "https"}
+                and destino.netloc == request.host
+            ):
+                return redirect(destino.geturl())
+            return redirect(url_for("portada"))
+
+    return render_template("login.html", siguiente=siguiente)
+
+
+@app.route("/logout", methods=["POST"])
+@login_required
+def logout():
+    """Cierra la sesión actual."""
+    logout_user()
+    session.pop("_csrf_token", None)
+    flash("Has cerrado la sesión.", "success")
+    return redirect(url_for("portada"))
 
 
 @app.route("/indicadores-tecnicos", methods=["GET", "POST"])
@@ -134,6 +373,7 @@ def indicadores_tecnicos():
 
 
 @app.route("/estrategia-v2", methods=["GET", "POST"])
+@login_required
 def estrategia_v2():
     """Ejecuta el backtest de EstrategiaV2."""
     return _pagina_estrategia(ejecutar_estrategia, "EstrategiaV2")
@@ -151,7 +391,8 @@ def _pagina_estrategia(funcion_estrategia, nombre_estrategia):
     En solicitudes POST valida el ticker, las fechas, los umbrales RSI y de
     probabilidad (entre 0 y 100), y los períodos de las medias móviles. Si los
     datos son válidos, ejecuta la estrategia indicada y prepara sus métricas y gráfico.
-    El formulario, los errores y los resultados se renderizan en ``index.html``.
+    El formulario, los errores y los resultados se renderizan en
+    ``estrategias.html``.
     """
     valores = {
         "ticker": request.form.get("ticker", "SAN.MC").strip(),
@@ -250,10 +491,15 @@ def _pagina_estrategia(funcion_estrategia, nombre_estrategia):
                 error = str(exc)
 
     return render_template(
-        "index.html",
+        "estrategias.html",
         valores=valores,
         error=error,
         resultado=resultado,
         hoy=date.today().isoformat(),
         nombre_estrategia=nombre_estrategia,
     )
+
+"""
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
+"""

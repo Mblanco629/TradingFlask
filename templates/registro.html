@@ -1,0 +1,25 @@
+{% extends "principal.html" %}
+
+{% block title %}Crear cuenta | TradingFlask{% endblock %}
+
+{% block content %}
+<section class="card auth-card">
+    <h1>Crear cuenta</h1>
+    <p>Regístrate para acceder al área privada de EstrategiaV2.</p>
+    <form method="post">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <label for="nombre_usuario">
+            Nombre de usuario
+            <input id="nombre_usuario" name="nombre_usuario" autocomplete="username"
+                   minlength="3" maxlength="40" required>
+        </label>
+        <label for="contrasena">
+            Contraseña (mínimo 8 caracteres)
+            <input id="contrasena" name="contrasena" type="password"
+                   autocomplete="new-password" minlength="8" required>
+        </label>
+        <button type="submit">Crear cuenta</button>
+    </form>
+    <p>¿Ya tienes cuenta? <a href="{{ url_for('login') }}">Inicia sesión</a>.</p>
+</section>
+{% endblock %}

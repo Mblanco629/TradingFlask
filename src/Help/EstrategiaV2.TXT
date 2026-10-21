@@ -1,0 +1,28 @@
+
+🛠️ Configuración de Indicadores (Gráfico Diario / 4H)
+
+• Medias Móviles (Tendencia):
+	• EMA de 20 períodos (tendencia a corto plazo / soporte dinámico).
+	• EMA de 50 períodos (filtro de tendencia institucional).
+• RSI (Momento): 14 períodos con niveles estándar (70/30) más una línea central en 50.
+• Volumen (Confirmación de interés): Media móvil de volumen de 20 períodos.
+• Volatilidad (Espacio y Riesgo): Bandas de Bollinger (20, 2) o ATR (Average True Range de 14 períodos).
+
+📈 Reglas de Entrada (Posición Larga / Compra)
+
+Para abrir una operación de compra, se deben alinear los cuatro filtros:
+1. Filtro de Tendencia (Medias Móviles): El precio debe estar por encima de la EMA 20 y la EMA 50. Lo ideal es que la EMA 20 esté cruzando al alza la EMA 50.
+2. Filtro de Momento (RSI): El RSI debe estar por encima de 50, pero por debajo de 65 (buscamos fuerza, pero no un activo ya sobrecomprado).
+3. Filtro de Volatilidad: Las Bandas de Bollinger deben estarse abriendo tras un período de estrechamiento (compresión de volatilidad), o el precio debe romper la banda superior.
+4. Gatillo de Entrada (Volumen): El precio rompe una resistencia clave o el máximo del día anterior con una vela de rango amplio. El volumen de esa vela debe ser superior a su media de 20 períodos (valida que los institucionales están comprando).
+
+📉 Gestión del Riesgo y Salida (Stop Loss y Take Profit)
+
+El swing trading vive y muere por la gestión del riesgo. Nunca operes sin estos parámetros:
+
+Parámetro	Estrategia de Colocación	Razón Técnica
+Stop Loss (SL)	Por debajo del último mínimo local o 1.5 veces el ATR desde el precio de entrada.	Protege la cuenta si la ruptura resulta ser falsa.
+Take Profit (TP)	Ratio Riesgo/Beneficio mínimo de 1:2 (buscar ganar el doble de lo arriesgado).	Asegura matemática matemática positiva a largo plazo.
+Gestión Dinámica	Mover el Stop Loss a Breakeven (punto de equilibrio) cuando el precio alcance un ratio 1:1.	Elimina el riesgo de pérdida rápidamente.
+
+• Criterio de salida anticipada: Si el RSI toca la zona de sobrecompra (70) y empieza a girar a la baja, o si el precio cierra por debajo de la EMA de 20 períodos, se cierra la posición manualmente para proteger ganancias.

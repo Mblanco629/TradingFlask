@@ -21,27 +21,42 @@
             <span>Trading<span class="site-logo-accent">Flask</span></span>
         </a>
         <nav class="site-nav" aria-label="Menú principal">
-            <a href="{{ url_for('portada') }}"
+            <a href="{{ url_for('portada') }}" target="_blank" rel="noopener noreferrer"
                {% if request.endpoint == 'portada' %}aria-current="page"{% endif %}>
                 Inicio
             </a>
-            <a href="{{ url_for('indicadores_tecnicos') }}"
+            <a href="{{ url_for('indicadores_tecnicos') }}" target="_blank" rel="noopener noreferrer"
                {% if request.endpoint == 'indicadores_tecnicos' %}aria-current="page"{% endif %}>
                 Indicadores Técnicos
             </a>
-            <a href="{{ url_for('estrategia_v2') }}"
+            <a href="{{ url_for('estrategia_v2') }}" target="_blank" rel="noopener noreferrer"
                {% if request.endpoint == 'estrategia_v2' %}aria-current="page"{% endif %}>
-                EstrategiaV2
+                EstrategiaV2 · Privado
             </a>
-            <a href="{{ url_for('estrategia_v1') }}"
+            <a href="{{ url_for('estrategia_v1') }}" target="_blank" rel="noopener noreferrer"
                {% if request.endpoint == 'estrategia_v1' %}aria-current="page"{% endif %}>
                 EstrategiaV1
             </a>
+            {% if current_user.is_authenticated %}
+            <span class="site-nav-user">{{ current_user.nombre_usuario }}</span>
+            <form class="nav-logout" action="{{ url_for('logout') }}" method="post">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit">Cerrar sesión</button>
+            </form>
+            {% else %}
+            <a href="{{ url_for('login') }}">Iniciar sesión</a>
+            <a href="{{ url_for('registro') }}">Crear cuenta</a>
+            {% endif %}
         </nav>
     </div>
 </header>
 
 <main class="site-main">
+    {% with mensajes = get_flashed_messages(with_categories=true) %}
+        {% for categoria, mensaje in mensajes %}
+        <p class="site-flash {{ categoria }}" role="status">{{ mensaje }}</p>
+        {% endfor %}
+    {% endwith %}
     {% block content %}{% endblock %}
 </main>
 
