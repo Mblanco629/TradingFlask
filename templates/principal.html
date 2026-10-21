@@ -33,6 +33,10 @@
                {% if request.endpoint == 'estrategia_v2' %}aria-current="page"{% endif %}>
                 EstrategiaV2 · Privado
             </a>
+            <a href="{{ url_for('estrategia_v3') }}" target="_blank" rel="noopener noreferrer"
+               {% if request.endpoint == 'estrategia_v3' %}aria-current="page"{% endif %}>
+                EstrategiaV3 · Privado
+            </a>
             <a href="{{ url_for('estrategia_v1') }}" target="_blank" rel="noopener noreferrer"
                {% if request.endpoint == 'estrategia_v1' %}aria-current="page"{% endif %}>
                 EstrategiaV1

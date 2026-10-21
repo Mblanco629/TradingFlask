@@ -1,0 +1,55 @@
+{% extends "principal.html" %}
+
+{% block title %}EstrategiaV3 | TradingFlask{% endblock %}
+
+{% block content %}
+<section class="card">
+    <h1>Optimización de parámetros · EstrategiaV3</h1>
+    <p>Elige un ticker y un período para buscar el mejor cruce de medias móviles.</p>
+    <form method="post">
+        <label for="ticker">
+            Ticker
+            <input id="ticker" name="ticker" value="{{ valores.ticker }}"
+                   placeholder="SAN.MC" required>
+        </label>
+        <label for="fecha_inicio">
+            Fecha de inicio
+            <input id="fecha_inicio" name="fecha_inicio" type="date"
+                   value="{{ valores.fecha_inicio }}" max="{{ hoy }}" required>
+        </label>
+        <label for="fecha_fin">
+            Fecha de fin
+            <input id="fecha_fin" name="fecha_fin" type="date"
+                   value="{{ valores.fecha_fin }}" max="{{ hoy }}" required>
+        </label>
+        <button type="submit">Buscar mejores parámetros</button>
+    </form>
+
+    {% if error %}
+    <p class="error" role="alert">{{ error }}</p>
+    {% endif %}
+
+    {% if resultado %}
+    <section class="results" aria-labelledby="resultado-titulo">
+        <h2 id="resultado-titulo">Mejores parámetros para {{ valores.ticker }}</h2>
+        <div class="metrics">
+            <p>Media rápida: <strong>{{ resultado.periodo_rapido }} sesiones</strong></p>
+            <p>Media lenta: <strong>{{ resultado.periodo_lento }} sesiones</strong></p>
+            <p>Ratio Sharpe en optimización: <strong>{{ "%.2f"|format(resultado.sharpe_entrenamiento) }}</strong></p>
+            <p>Rentabilidad en optimización: <strong>{{ "%.2f"|format(resultado.rentabilidad_entrenamiento * 100) }}%</strong></p>
+            {% if resultado.sharpe_prueba is not none %}
+            <p>Ratio Sharpe en validación: <strong>{{ "%.2f"|format(resultado.sharpe_prueba) }}</strong></p>
+            {% else %}
+            <p>Ratio Sharpe en validación: <strong>No calculable</strong></p>
+            {% endif %}
+            <p>Rentabilidad en validación: <strong>{{ "%.2f"|format(resultado.rentabilidad_prueba * 100) }}%</strong></p>
+        </div>
+        <p class="chart-help">
+            Los parámetros se seleccionan maximizando el ratio Sharpe en el 70 %
+            inicial de los datos. El 30 % final se reserva para validación.
+            La simulación descuenta una comisión del 0,2 % por operación.
+        </p>
+    </section>
+    {% endif %}
+</section>
+{% endblock %}

@@ -1,0 +1,15 @@
+
+El proceso lógico (Rutina de Optimización)
+
+1. Definir las variables: Elige qué parámetros quieres variar (por ejemplo, el período de una Media Móvil entre 10 y 50).
+2. Establecer el paso (Step): Determina cada cuánto aumentará la variable (por ejemplo, ir de 2 en 2).
+3. Ejecutar bucles en cascada: La IA o el script correrá el backtesting docenas de veces combinando todos los valores.
+4. Guardar y ordenar resultados: Filtrar las combinaciones por la métrica que más te importe (Net Profit, Profit Factor o Sharpe Ratio).
+
+
+
+⚠️ Regla de Oro contra el "Overfitting" (Sobreajuste)
+
+El mayor peligro al optimizar con IA o algoritmos es encontrar parámetros que fueron perfectos en el pasado, pero que fracasarán mañana. Para evitarlo, divide tus datos en dos partes:
+• Datos In-Sample (70%): Usa este bloque de tiempo para correr la rutina y encontrar la "mejor" configuración.
+• Datos Out-of-Sample (30%): Toma los mejores parámetros y pruébalos en este bloque de tiempo restante que el algoritmo nunca vio. Si sigue siendo rentable, la estrategia es robusta.

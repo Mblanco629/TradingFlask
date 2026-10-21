@@ -1,8 +1,8 @@
 
-"""Aplicación web Flask para herramientas de análisis bursátil.
+"""Aplicación Flask para noticias bursátiles y backtests de estrategias.
 
-Sirve la portada y el backtest de ``EstrategiaV2`` mediante las plantillas de
-``templates/`` y los recursos de ``static/``, ubicados en la raíz del proyecto.
+Sirve la portada y las estrategias mediante las plantillas de ``templates/``
+y los recursos de ``static/``, ubicados en la raíz del proyecto.
 """
 
 import hmac
@@ -43,10 +43,12 @@ if __package__ in {None, ""}:
     from src.CargaDatos import calcular_indicadores, descargar_datos
     from src.EstrategiaV1 import ejecutar_estrategia as ejecutar_estrategia_v1
     from src.EstrategiaV2 import ejecutar_estrategia
+    from src.EstrategiaV3 import ejecutar_estrategia as ejecutar_estrategia_v3
 else:
     from .CargaDatos import calcular_indicadores, descargar_datos
     from .EstrategiaV1 import ejecutar_estrategia as ejecutar_estrategia_v1
     from .EstrategiaV2 import ejecutar_estrategia
+    from .EstrategiaV3 import ejecutar_estrategia as ejecutar_estrategia_v3
 
 app = Flask(__name__, template_folder="../templates", static_folder="../static")
 URL_RSS_BME = (
@@ -70,7 +72,7 @@ app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 db = SQLAlchemy(app)
 login_manager = LoginManager()
 login_manager.login_view = "login"
-login_manager.login_message = "Inicia sesión para acceder a EstrategiaV2."
+login_manager.login_message = "Inicia sesión para acceder al área privada."
 login_manager.login_message_category = "error"
 login_manager.init_app(app)
 
@@ -377,6 +379,57 @@ def indicadores_tecnicos():
 def estrategia_v2():
     """Ejecuta el backtest de EstrategiaV2."""
     return _pagina_estrategia(ejecutar_estrategia, "EstrategiaV2")
+
+
+@app.route("/estrategia-v3", methods=["GET", "POST"])
+@login_required
+def estrategia_v3():
+    """Optimiza y muestra los parámetros privados de EstrategiaV3."""
+    hoy = date.today()
+    valores = {
+        "ticker": request.form.get("ticker", "SAN.MC").strip(),
+        "fecha_inicio": request.form.get(
+            "fecha_inicio", (hoy - timedelta(days=365 * 5)).isoformat()
+        ),
+        "fecha_fin": request.form.get("fecha_fin", hoy.isoformat()),
+    }
+    error = None
+    resultado = None
+
+    if request.method == "POST":
+        try:
+            fecha_inicio = datetime.strptime(
+                valores["fecha_inicio"], "%Y-%m-%d"
+            ).date()
+            fecha_fin = datetime.strptime(
+                valores["fecha_fin"], "%Y-%m-%d"
+            ).date()
+            if not valores["ticker"]:
+                error = "Introduce un ticker."
+            elif fecha_inicio >= fecha_fin:
+                error = "La fecha de inicio debe ser anterior a la fecha de fin."
+            elif fecha_fin > hoy:
+                error = "La fecha de fin no puede ser posterior a hoy."
+        except ValueError:
+            error = "Introduce fechas válidas."
+
+        if error is None:
+            try:
+                resultado = ejecutar_estrategia_v3(
+                    valores["ticker"],
+                    fecha_inicio.isoformat(),
+                    (fecha_fin + timedelta(days=1)).isoformat(),
+                )
+            except ValueError as exc:
+                error = str(exc)
+
+    return render_template(
+        "estrategia_v3.html",
+        valores=valores,
+        error=error,
+        resultado=resultado,
+        hoy=hoy.isoformat(),
+    )
 
 
 @app.route("/estrategia-v1", methods=["GET", "POST"])
