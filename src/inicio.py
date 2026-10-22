@@ -157,6 +157,12 @@ def portada():
     )
 
 
+@app.route("/chatbot")
+def chatbot():
+    """Muestra el chatbot conectado al webhook de n8n."""
+    return render_template("chatbot.html")
+
+
 def _cargar_noticias(url_feed, dominio, fuente):
     """Devuelve hasta cinco noticias de un RSS, validando su dominio."""
     try:

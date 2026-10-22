@@ -25,6 +25,10 @@
                {% if request.endpoint == 'portada' %}aria-current="page"{% endif %}>
                 Inicio
             </a>
+            <a href="{{ url_for('chatbot') }}"
+               {% if request.endpoint == 'chatbot' %}aria-current="page"{% endif %}>
+                Chatbot
+            </a>
             <a href="{{ url_for('indicadores_tecnicos') }}"
                {% if request.endpoint == 'indicadores_tecnicos' %}aria-current="page"{% endif %}>
                 Indicadores Técnicos

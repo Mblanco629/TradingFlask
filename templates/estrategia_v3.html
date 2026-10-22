@@ -32,6 +32,10 @@
     {% if resultado %}
     <section class="results" aria-labelledby="resultado-titulo">
         <h2 id="resultado-titulo">Mejores parámetros para {{ valores.ticker }}</h2>
+        <p class="chart-help">
+            Recomendación del backtesting para la siguiente sesión:
+            <strong>{{ resultado.recomendacion_backtest }}</strong>
+        </p>
         <div class="metrics">
             <p>Media rápida: <strong>{{ resultado.periodo_rapido }} sesiones</strong></p>
             <p>Media lenta: <strong>{{ resultado.periodo_lento }} sesiones</strong></p>
@@ -49,6 +53,41 @@
             inicial de los datos. El 30 % final se reserva para validación.
             La simulación descuenta una comisión del 0,2 % por operación.
         </p>
+
+        <section class="results" aria-labelledby="resultado-ia-titulo">
+            <h2 id="resultado-ia-titulo">Modelo IA · Random Forest</h2>
+            <p>
+                El modelo se entrena con el mismo 70 % inicial y se valida con
+                el 30 % final. Estima si el cierre de la siguiente sesión será
+                superior al cierre actual.
+            </p>
+            <div class="metrics">
+                <p>Señal para la siguiente sesión:
+                    <strong>{{ resultado.modelo_ia.senal_actual }}</strong>
+                </p>
+                <p>Probabilidad estimada de subida:
+                    <strong>{{ "%.2f"|format(resultado.modelo_ia.probabilidad_alza_actual * 100) }}%</strong>
+                </p>
+                <p>Exactitud en validación:
+                    <strong>{{ "%.2f"|format(resultado.modelo_ia.accuracy_validacion * 100) }}%</strong>
+                </p>
+                <p>Precisión en validación:
+                    <strong>{{ "%.2f"|format(resultado.modelo_ia.precision_validacion * 100) }}%</strong>
+                </p>
+                <p>Recall en validación:
+                    <strong>{{ "%.2f"|format(resultado.modelo_ia.recall_validacion * 100) }}%</strong>
+                </p>
+                <p>F1 en validación:
+                    <strong>{{ "%.2f"|format(resultado.modelo_ia.f1_validacion * 100) }}%</strong>
+                </p>
+                <p>Muestras de entrenamiento:
+                    <strong>{{ resultado.modelo_ia.muestras_entrenamiento }}</strong>
+                </p>
+                <p>Muestras de validación:
+                    <strong>{{ resultado.modelo_ia.muestras_validacion }}</strong>
+                </p>
+            </div>
+        </section>
     </section>
     {% endif %}
 </section>
